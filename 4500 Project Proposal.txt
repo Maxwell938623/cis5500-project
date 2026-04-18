@@ -1,0 +1,43 @@
+﻿1. Motivation and Problem Description
+The rapidly increasing prominence of fare evasion in New York City subways has become a hot political and economic topic. According to the Citizens Budget Commission, “Fare and toll evasion cost the Metropolitan Transportation Authority (MTA) approximately $1 billion in revenue in 2024”. Currently, the MTA has an “approximately $800 million structural operating budget gap,” and rates of crime, arrests, and graffiti/public property vandalization have also subsequently increased. Thus, working to reduce fare evasion on the MTA is an important project to secure the future of New York City and its millions of inhabitants. Thus, we hope to create a website that aims to inform future city-planning and security measures surrounding public transportation in New York City. Our intended audience includes law enforcement, the MTA itself, and other security. 
+
+
+2. List of Major Features (Definitely Implement)
+We hope to include the following interactive pages on our website:
+1. Borough-Level Equity Comparison
+   1. A comparative visualization dashboard (using bar charts or radar plots) that aggregates data by NYC borough (Brooklyn, Manhattan, Queens, Bronx). It will display the "Enforcement-to-Rider" ratio, normalized by 100,000 riders, to highlight which boroughs experience the highest intensity of police intervention relative to their actual subway traffic. 
+2. Financial Impact Analysis
+   1. A dashboard displaying fare evasion-related analytics. For example, estimated lost revenue, estimated fare-evaders per day of the weak/season/year, etc. A user can input hypothetical changes to the MTA fare and use historical fare evasion with respect to fare price to estimate change in revenue.
+3. Station Safety Index
+   1. A dropdown menu with search capabilities where users can query specific stations in the MTA network. After selecting a station, the page will show that particular station’s attributes, such as its rank in NYC enforcement actions and ratio of arrests to summons. Users can also filter by regions, transit lines, and time periods to see enforcement rates at different locations and time periods. 
+
+
+3. List of Features (Might Implement)
+1. A Geospatial Heatmap of Law Enforcement vs. Traffic
+   1. Interactive map of NYC embedding a graph of subway station nodes. The heatmap will have two layers: “Ridership Volume” (derived from turnstile data) and “Law Enforcement Presence” (derived from NYPD arrests/reports).
+2. Historical Time-Series Trend Analysis
+   1. A multi-line chart tracking longitudinal data from 2018 to 2024. Users can toggle between "Estimated Evasion Rates" (Dataset 2) and "Total NYPD Arrests/Summons" (Dataset 3). The graph will allow users to filter by "Season" to see if enforcement spikes during colder months or holiday periods. 
+
+
+4. List of Pages
+* Each page will contain one major feature (that we will definitely implement) and possibly some number of minor features (that we might implement) 
+1. Borough-Level Equity Comparison Page: We will create a dashboard to show the differences in subway ridership between the different boroughs in NYC. This will include data such as additional information about the security enforcement at each location.
+2. Financial Impact Analysis Page: We will include a page detailing the negative financial impacts that subway fare evasion has on the city, with the ability for users to estimate data for certain time periods. This page also has a feature to allow users to estimate data based on certain parameters. 
+3. Station Safety Index Page: This page is mostly for New York City subway riders to use to gauge how safe or dangerous certain subway stations and lines in the city are. To do this, users can apply certain filters that relate to them. 
+
+
+7. Data Cleaning and Pre-processing
+* Since Dataset 1 is cumulative, we will use Pandas to subtract the previous net value from the current net value to get actual traffic for every 4-hour block.
+* Use Pandas to extract quarterly data from the Excel files from Dataset 3.
+* Map each station in the Turnstile data to the exact latitude and longitude in the Geospatial data using a dictionary.
+* Remove data with excessive NULL columns.
+8. List of Technologies
+* Database: PostgreSQL
+* Backend: Python/FastAPI
+* Frontend: React
+* Data Analysis: Pandas
+9. Group Member Responsibilities
+* Kate Li: UI/UX Design and React implementation of the dashboard.
+* Maxwell Zhang: Database architecture and general SQL query optimization.
+* Rhea Malik: Backend API development and borough comparison logic.
+* Roberto Tamez: Managing data pipeline, including scraping Dataset 3 and cleaning Dataset 1.

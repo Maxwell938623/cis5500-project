@@ -1,0 +1,587 @@
+FINAL PRODUCT STEP-BY-STEP INSTRUCTIONS
+NYC Subway Fare Evasion Web Application
+
+Purpose of this document
+This document consolidates the project guidelines, the milestone outline, the milestone SQL query document, the uploaded sample CSVs, and the current AWS/PostgreSQL DDL into one implementation guide for what the final product should contain. It is written so the team can build the final application in a way that is fully aligned with what has already been submitted.
+
+==================================================
+1. WHAT THE FINAL PRODUCT MUST BE
+==================================================
+
+Build a multi-page web application on top of a PostgreSQL database hosted on AWS RDS. The project must use the existing NYC subway fare-evasion / ridership / station datasets and expose the data through a backend API and multiple distinct frontend pages. The final product should directly reflect the pages and core functionality already promised in Milestone 2 and should use the SQL work already defined in Milestone 3.
+
+Per the project guidelines, the final product must include:
+- a SQL-backed web application with multiple distinct pages;
+- a normalized PostgreSQL database hosted on AWS RDS;
+- at least 10 SQL queries total;
+- at least 4 complex queries, with at least 2 having meaningful runtime before optimization;
+- a backend API with routes corresponding to the queries;
+- a polished final report, code submission, and demo video;
+- a live demo presentation that explains datasets, cleaning, schema, complex queries, and optimizations.
+
+==================================================
+2. WHAT IS ALREADY COMMITTED FROM THE MILESTONES
+==================================================
+
+The final product should preserve the following major pages promised in Milestone 2:
+1. Borough-Level Equity Comparison page
+2. Financial Impact Analysis page
+3. Station Safety Index page
+
+The following possible stretch features were also proposed:
+4. Geospatial Heatmap of Law Enforcement vs. Traffic
+5. Historical Time-Series Trend Analysis
+
+The technology stack already committed in Milestone 2 is:
+- Database: PostgreSQL
+- Backend: Python / FastAPI
+- Frontend: React
+- Data analysis / preprocessing: Pandas
+
+The final implementation should continue using that stack unless there is a very strong reason to change it.
+
+==================================================
+3. IMPORTANT REALITY CHECKS FROM THE ACTUAL DATA / DDL
+==================================================
+
+Before implementation, the team must align the milestone writeup with the data that actually exists in the current database.
+
+Confirmed current database tables from the provided DDL:
+1. public.fareevasionstats
+2. public.stationcoords
+3. public.ridership
+
+Important mismatch #1: table name mismatch
+- The Milestone 3 SQL document uses a table named "fairevasion".
+- The actual DDL defines the table as "fareevasionstats".
+- Every query, route, ORM/SQL call, and documentation reference must be updated so the application uses the real table name consistently.
+
+Important mismatch #2: scope mismatch with originally described law-enforcement content
+- The Milestone 2 outline references law-enforcement presence, arrests, summons, and policing intensity.
+- The current DDL does NOT include an arrests, summons, NYPD, or law-enforcement table.
+- Therefore, the final app cannot honestly claim to show actual arrests/summons metrics unless another dataset/table is added.
+- The current final product should instead be framed around fare evasion, ridership patterns, station accessibility/context, borough comparisons, and station-level fare-class/ridership risk indicators.
+
+Important mismatch #3: borough encoding mismatch
+- In ridership, borough values are full names: Bronx, Brooklyn, Manhattan, Queens.
+- In stationcoords, borough values are abbreviations: Bk, Bx, M, Q, SI.
+- Any join, filter, or display logic that combines borough-level information from both tables must normalize borough names first.
+
+Important mismatch #4: station join key mismatch
+- ridership uses station_complex_id as text.
+- stationcoords uses complex_id as integer.
+- Existing SQL already casts text to text around this join. Preserve a clean, consistent join rule across all queries and API code.
+
+Important mismatch #5: sample fare-evasion data includes missing values
+- The uploaded fare evasion sample has at least one row with NULL fare_evasion and NULL margin_of_error.
+- The final product must explicitly filter out NULL fare_evasion rows anywhere rates are graphed or used in calculations.
+
+Important mismatch #6: station page wording must match available data
+- The original Station Safety Index description promises "rank in NYC enforcement actions" and "ratio of arrests to summons".
+- That is not supported by the current schema.
+- The page should be reworded to reflect a station-level ridership / fare-profile / accessibility / location risk index based on the existing data.
+
+==================================================
+4. WHAT TO CONSTRUCT IN THE DATABASE LAYER
+==================================================
+
+Step 1. Finalize the three-table schema in PostgreSQL.
+Use the current DDL as the source of truth:
+- fareevasionstats(year, quarter, fare_evasion, margin_of_error)
+- stationcoords(station_id, gtfs_stop_id, complex_id, division, line, stop_name, borough, cbd, daytime_routes, structure, gtfs_latitude, gtfs_longitude, north_direction_label, south_direction_label, ada, ada_northbound, ada_southbound)
+- ridership(transit_timestamp, transit_mode, station_complex_id, station_complex, borough, payment_method, fare_class_category, ridership, transfers, latitude, longitude, year, quarter)
+
+Step 2. Clean and standardize the CSV source files before or during ingest.
+Use Pandas preprocessing scripts to do the following:
+- rename CSV columns so they match the database table column names exactly;
+- convert stationcoords column names from title-case/spaced names to snake_case field names used in the DDL;
+- convert "Fare Evasion" and "Margin of Error" into fare_evasion and margin_of_error;
+- ensure complex_id is integer in stationcoords and station_complex_id is stored consistently in ridership;
+- verify quarter and year are populated correctly in all datasets;
+- preserve latitude / longitude fields for mapping and station displays;
+- filter or document any rows with NULL critical fields.
+
+Step 3. Normalize borough labels.
+Create a preprocessing mapping for stationcoords borough abbreviations:
+- Bk -> Brooklyn
+- Bx -> Bronx
+- M  -> Manhattan
+- Q  -> Queens
+- SI -> Staten Island
+
+Even if Staten Island does not appear in ridership data, normalize it anyway for correctness.
+If the database keeps the raw abbreviations in stationcoords, then create either:
+- a normalized view; or
+- CASE logic inside queries; or
+- a preprocessing step that replaces the abbreviations before loading.
+
+Step 4. Load all datasets into AWS RDS.
+The project guidelines explicitly require a PostgreSQL database hosted on AWS RDS for the project milestone/final build. Load the cleaned data into the three tables and verify row counts after import.
+
+Step 5. Validate schema quality.
+Prepare to explain in the final report:
+- primary keys;
+- why the schema is in 3NF / BCNF;
+- how the tables relate conceptually;
+- how the join between ridership and stationcoords works;
+- how quarterly fare evasion data connects to yearly/quarterly ridership aggregates.
+
+Step 6. Add indexes for optimization.
+At minimum, evaluate indexes on:
+- ridership(year, quarter)
+- ridership(borough)
+- ridership(station_complex_id)
+- stationcoords(complex_id)
+- fareevasionstats(year, quarter)
+
+Also consider indexes depending on the actual route filters used:
+- ridership(payment_method)
+- ridership(fare_class_category)
+- stationcoords(cbd)
+- stationcoords(borough)
+
+Record before/after timings for the complex queries.
+
+==================================================
+5. WHAT TO CONSTRUCT IN THE BACKEND API
+==================================================
+
+The project guidelines require routes corresponding to the milestone queries. Therefore, construct backend API routes for all 10 milestone queries, even if some are used directly by pages and some are auxiliary.
+
+Use FastAPI and organize the backend clearly into:
+- app startup / main file
+- database connection/config module
+- query/DAO layer or service layer
+- route files grouped by feature/page
+- optional caching/utilities module
+
+Each API route must have:
+- route path;
+- HTTP method;
+- route description;
+- input parameters (path/query/body as relevant);
+- SQL query or query-builder logic;
+- JSON response schema;
+- error handling for null/empty/invalid inputs.
+
+Recommended route set mapped from Milestone 3 queries:
+
+Route 1: /stations/busiest
+Purpose: return top N busiest stations by total ridership.
+Uses Query 1.
+Suggested params: limit (optional), year_start (optional), year_end (optional), borough (optional).
+Primary page use: Station Safety Index.
+
+Route 2: /fare-evasion/quarterly
+Purpose: return quarterly fare evasion percentages and margins of error over time.
+Uses Query 2.
+Suggested params: year_start, year_end.
+Primary page use: Financial Impact Analysis.
+
+Route 3: /boroughs/ridership-by-year
+Purpose: return total ridership per borough per year.
+Uses Query 3.
+Suggested params: borough (optional), year_start, year_end.
+Primary page use: Borough-Level Equity Comparison.
+
+Route 4: /boroughs/ada-stations
+Purpose: return ADA-accessible station counts by borough.
+Uses Query 4.
+Suggested params: borough (optional).
+Primary page use: Borough-Level Equity Comparison.
+
+Route 5: /boroughs/payment-share
+Purpose: return ridership totals and percentages by borough and payment method.
+Uses Query 5.
+Suggested params: borough (optional), payment_method (optional), year (optional).
+Primary page use: Financial Impact Analysis.
+
+Route 6: /fare-evasion/revenue-loss
+Purpose: estimate quarterly lost revenue using quarterly fare evasion and ridership.
+Uses Query 6.
+Suggested params: fare_amount (default 2.90), year_start, year_end.
+Primary page use: Financial Impact Analysis.
+Note: parameterize fare amount so the "hypothetical fare change" feature promised in Milestone 2 is actually supported.
+
+Route 7: /boroughs/evasion-intensity
+Purpose: compute estimated evaded rides per 100k riders by borough/year.
+Uses Query 7.
+Suggested params: borough (optional), year_start, year_end.
+Primary page use: Borough-Level Equity Comparison.
+Note: rename this metric away from literal "enforcement" unless a real enforcement dataset is added.
+
+Route 8: /stations/risk-profile
+Purpose: rank stations by reduced-fare share / risk profile.
+Uses Query 8.
+Suggested params: borough (optional), station_name (optional), line (optional), limit (optional).
+Primary page use: Station Safety Index.
+
+Route 9: /trends/ridership-vs-evasion
+Purpose: compare annual ridership recovery and annual fare-evasion trends.
+Uses Query 9.
+Suggested params: year_start, year_end.
+Primary page use: Historical Time-Series Trend Analysis or Financial Impact Analysis as a secondary chart.
+
+Route 10: /map/top-non-cbd-stations
+Purpose: return top non-CBD stations by borough with coordinates for map visualization.
+Uses Query 10.
+Suggested params: borough (optional), top_k (default 5).
+Primary page use: Geospatial Heatmap.
+
+Recommended auxiliary routes (not required by Milestone 3 but useful for frontend UX):
+- /stations/search for dropdown autocomplete
+- /stations/{station_complex_id} for a single station summary card
+- /metadata/boroughs
+- /metadata/lines
+- /metadata/payment-methods
+- /metadata/fare-categories
+
+==================================================
+6. WHAT TO CONSTRUCT IN THE FRONTEND
+==================================================
+
+Use React to build a multi-page application. Each page must have meaningfully different functionality and must interact with the database through the API.
+
+The final product should include the following pages.
+
+PAGE 1. Borough-Level Equity Comparison
+Status: definitely implement
+Must include:
+- a borough comparison dashboard;
+- a year selector or year range filter;
+- a chart showing borough total ridership by year (from Query 3);
+- a chart or table showing ADA-accessible station counts by borough (from Query 4);
+- a chart showing estimated evaded rides per 100k riders by borough/year (from Query 7), but with wording adjusted away from unsupported policing claims.
+
+How this page should be framed:
+- compare boroughs on ridership volume, accessibility context, and estimated evasion intensity;
+- show whether boroughs with higher ridership also show different estimated evasion patterns.
+
+Important wording rule:
+Do not present this as actual "police intervention" or "law enforcement intensity" unless the team later adds a genuine enforcement dataset.
+
+Recommended UI elements:
+- borough multi-select or all-borough view;
+- year dropdown or slider;
+- grouped bar chart;
+- metric cards for total ridership / ADA stations / evasion per 100k;
+- explanatory note on how estimated evasion is derived.
+
+PAGE 2. Financial Impact Analysis
+Status: definitely implement
+Must include:
+- historical quarterly fare evasion line chart with margin of error (Query 2);
+- payment-method share by borough chart/table (Query 5);
+- estimated quarterly revenue loss table/chart (Query 6);
+- fare amount input box or slider to support the hypothetical fare-change analysis promised in Milestone 2.
+
+How this page should be framed:
+- quantify how fare evasion affects estimated revenue;
+- show how payment patterns differ by borough;
+- allow the user to test alternative fare levels using the same evasion-rate framework.
+
+Recommended UI elements:
+- fare input parameter (default 2.90);
+- quarter/year filters;
+- line chart for fare evasion over time;
+- table of estimated total boardings, evaded rides, revenue loss;
+- stacked bar or grouped bar chart for payment method share.
+
+Implementation note:
+The milestone outline says users can input hypothetical fare changes and estimate revenue changes. This must be supported by passing a fare parameter into the revenue-loss route rather than hardcoding only 2.90.
+
+PAGE 3. Station Safety Index
+Status: definitely implement, but reframe based on actual data
+Must include:
+- station search dropdown/autocomplete;
+- station summary card;
+- borough rank / risk profile table using Query 8;
+- top busiest stations context using Query 1;
+- filters by borough and possibly line.
+
+How this page should be framed:
+- station-level ridership context and fare-profile risk context;
+- accessibility/location attributes from stationcoords;
+- station rank within borough based on reduced-fare share or chosen risk proxy.
+
+What this page should show for a selected station:
+- station name;
+- borough;
+- total ridership;
+- reduced_fare_pct or other risk metric from Query 8;
+- borough rank;
+- daytime routes / lines;
+- ADA status;
+- CBD / non-CBD indicator;
+- latitude/longitude or mini-map if desired.
+
+Important wording rule:
+Do not claim to show "arrests to summons ratio" or direct law-enforcement activity unless such a table is actually added to the database.
+
+PAGE 4. Geospatial Heatmap / Map Page
+Status: stretch feature already proposed
+If implemented, it should include:
+- map of station points using coordinates;
+- top non-CBD stations by borough from Query 10;
+- optionally a layer for overall station volume;
+- filters by borough and line.
+
+Because there is currently no law-enforcement table, this page should focus on ridership geography and non-CBD hotspots unless additional data is introduced.
+
+PAGE 5. Historical Trend Analysis
+Status: stretch feature already proposed
+If implemented, it should include:
+- annual ridership vs. annual fare-evasion trend chart from Query 9;
+- year-over-year ridership change;
+- year-over-year evasion change;
+- interpretation text about system recovery vs. evasion trends.
+
+==================================================
+7. EXACTLY HOW TO USE THE EXISTING 10 SQL QUERIES
+==================================================
+
+The final product should retain the milestone queries as the backbone of the app, but they should be cleaned up and, where useful, parameterized.
+
+Query 1: Top 10 busiest stations by ridership
+Use in Station Safety Index as a leaderboard / context panel.
+Possible improvement: add optional year range, borough, and limit parameters.
+
+Query 2: Quarterly system-wide fare evasion rate over time
+Use in Financial Impact Analysis as the main historical trend chart.
+Required fix: change table reference from fairevasion to fareevasionstats.
+
+Query 3: Borough-level total ridership by year
+Use in Borough-Level Equity Comparison as a bar chart or multi-series line chart.
+
+Query 4: ADA-accessible stations per borough
+Use in Borough-Level Equity Comparison as supporting accessibility context.
+Required cleanup: verify SQL syntax spacing and exact column names in final code.
+
+Query 5: Payment method share by borough
+Use in Financial Impact Analysis.
+Possible improvement: allow year or quarter filtering.
+
+Query 6: Estimated revenue lost to fare evasion per quarter (complex)
+Use in Financial Impact Analysis as a table and/or chart.
+Required improvement: parameterize fare amount so the user can test hypothetical fare changes.
+Required fix: change table reference from fairevasion to fareevasionstats.
+
+Query 7: Borough evasion-intensity metric (complex)
+Use in Borough-Level Equity Comparison.
+Required reframing: this is an estimated evasion metric, not an actual law-enforcement metric.
+Required fix: change table reference from fairevasion to fareevasionstats.
+
+Query 8: Station risk profile per station (complex)
+Use in Station Safety Index.
+Potential improvement: join stationcoords so the selected-station panel can also display routes, ADA, and CBD context in the same response.
+
+Query 9: Annual ridership recovery vs. evasion trend (complex)
+Use in Historical Trend Analysis and optionally on the Financial page.
+Required fix: change table reference from fairevasion to fareevasionstats.
+
+Query 10: Top non-CBD stations by borough with coordinates (complex)
+Use in Geospatial Heatmap.
+Potential improvement: ensure borough normalization and consistent coordinate source.
+
+==================================================
+8. IMPLEMENTATION ORDER FOR THE FINAL PRODUCT
+==================================================
+
+Build the final product in this order.
+
+PHASE A. DATA + DATABASE FOUNDATION
+1. Clean all three datasets in Pandas.
+2. Rename columns to match the DDL exactly.
+3. Normalize borough encodings.
+4. Load cleaned data into AWS RDS PostgreSQL.
+5. Verify primary keys and row counts.
+6. Test the station join and fare-evasion join.
+7. Add baseline indexes.
+
+PHASE B. QUERY VALIDATION
+8. Rewrite all 10 queries so they use the actual table names and exact column names in the DDL.
+9. Run every query directly in PostgreSQL.
+10. Save expected outputs / screenshots / timings for each query.
+11. Identify at least 4 final complex queries for the report and demo.
+12. Choose at least 2 complex queries to benchmark before and after optimization.
+
+PHASE C. BACKEND API
+13. Set up FastAPI project structure.
+14. Add environment-variable based DB credentials.
+15. Implement one test route that successfully reads from the database and returns JSON.
+16. Implement the 10 milestone-backed routes.
+17. Add auxiliary metadata/search routes.
+18. Add validation and error handling.
+19. Add response models / schemas if convenient.
+20. Test all routes with sample parameters.
+
+PHASE D. FRONTEND PAGES
+21. Set up React frontend with page routing.
+22. Build shared UI components: navbar, filter bar, chart containers, loading/error state, metric cards.
+23. Build Borough-Level Equity Comparison page.
+24. Build Financial Impact Analysis page.
+25. Build Station Safety Index page.
+26. If time allows, build Geospatial Heatmap page.
+27. If time allows, build Historical Trend Analysis page.
+28. Ensure every main page makes at least one real API call to the backend.
+
+PHASE E. OPTIMIZATION + ROBUSTNESS
+29. Benchmark the complex queries before optimization.
+30. Add indexes / query rewrites / possible caching.
+31. Benchmark again after optimization.
+32. Record timings and explain why the optimizations helped.
+33. Test edge cases:
+   - empty results;
+   - invalid borough;
+   - invalid station name;
+   - NULL data cases;
+   - out-of-range year filters;
+   - zero-division cases already guarded by NULLIF.
+34. Make sure the app does not crash on bad input.
+
+PHASE F. FINAL SUBMISSION MATERIALS
+35. Prepare final report.
+36. Prepare README and code zip.
+37. Record 2-4 minute demo video.
+38. Prepare live-demo slides.
+
+==================================================
+9. REQUIRED CLEANUPS / FIXES BEFORE CALLING THE APP FINISHED
+==================================================
+
+The following fixes are required so the final product is internally consistent:
+
+Fix A. Rename all fare-evasion table references
+Replace every occurrence of:
+- fairevasion
+with:
+- fareevasionstats
+
+Fix B. Make page copy honest
+Replace unsupported wording such as:
+- arrests
+- summons
+- police intervention
+- enforcement-to-rider ratio
+if the app still only uses the current three tables.
+
+Use wording such as:
+- estimated evasion intensity
+- estimated evaded rides per 100k riders
+- fare-risk profile
+- station fare-profile ranking
+instead.
+
+Fix C. Normalize boroughs before combining stationcoords with ridership.
+Do not assume Bk/Bx/M/Q match the ridership borough strings automatically.
+
+Fix D. Add fare parameterization.
+The financial page promised a hypothetical fare-input feature. Implement it through the API and query logic.
+
+Fix E. Ensure station page includes stationcoords context.
+The selected-station page should surface real attributes from stationcoords such as line/daytime_routes, ADA, structure, and CBD/non-CBD.
+
+Fix F. Keep the query set at 10 or more.
+The final project guidelines explicitly require at least 10 routes/queries corresponding to milestone work.
+
+==================================================
+10. WHAT THE FINAL REPORT SHOULD COVER BASED ON THIS BUILD
+==================================================
+
+The final report should be organized around the project guidelines and the actual implemented app.
+
+Recommended final report structure:
+1. Title
+2. Introduction
+   - problem: NYC subway fare evasion and ridership analysis
+   - app goal
+   - group members
+3. Architecture
+   - PostgreSQL + AWS RDS
+   - FastAPI backend
+   - React frontend
+   - page overview
+4. Data
+   - ridership dataset
+   - station coordinates dataset
+   - fare evasion dataset
+   - source links
+   - summary statistics
+   - preprocessing performed
+5. Database
+   - final schema and ER diagram
+   - ingestion procedure
+   - row counts
+   - normalization / 3NF or BCNF explanation
+6. Queries
+   - highlight at least 5, especially the most complex ones
+   - explain which page uses each
+7. Performance evaluation
+   - before/after timings for the 4 complex queries
+   - indexing / caching / query rewrite discussion
+8. Technical challenges
+   - naming mismatch
+   - borough normalization
+   - station join key mismatch
+   - missing / NULL quarterly fare-evasion values
+   - page wording vs. available data
+9. Optional extra credit section
+10. Appendix
+   - remaining SQL queries
+   - API details if helpful
+
+==================================================
+11. WHAT THE DEMO VIDEO AND LIVE DEMO SHOULD SHOW
+==================================================
+
+The 2-4 minute video demo should show:
+- the purpose of the application;
+- all main pages;
+- at least one interactive filter on each page;
+- example query-driven outputs;
+- mention of complex queries and optimization impact.
+
+The live demo slides should cover:
+- problem and goal;
+- dataset overview;
+- cleaning / normalization steps;
+- schema / ER diagram;
+- complex queries and what they do;
+- runtime improvements;
+- technical challenges.
+
+During the live demo, be prepared to explain:
+- why the schema is normalized;
+- how the ridership and station datasets join;
+- how fare-evasion estimates are computed;
+- what changed between milestone language and the final data-supported product;
+- how invalid inputs are handled.
+
+==================================================
+12. RECOMMENDED FINAL FRAMING OF THE PROJECT
+==================================================
+
+Given the current actual database contents, the cleanest final framing is:
+
+A data-driven NYC subway analytics website that helps users explore borough-level ridership patterns, estimated fare-evasion trends, station-level fare-risk profiles, accessibility context, and estimated revenue impacts.
+
+This framing is accurate to the current schema, consistent with the milestones, and still supports a strong final demo.
+
+==================================================
+13. FINAL CHECKLIST
+==================================================
+
+The final product is ready only if all items below are true:
+- The app uses PostgreSQL on AWS RDS.
+- The three actual datasets are cleaned and loaded.
+- The fareevasionstats naming mismatch is fixed everywhere.
+- The app has at least 3 distinct main pages.
+- The backend exposes routes for all 10 milestone queries.
+- At least 4 queries are complex.
+- At least 2 complex queries have recorded before/after optimization timings.
+- The Financial page supports hypothetical fare input.
+- The Station page uses real stationcoords attributes.
+- The borough mismatch is normalized.
+- The app handles null / invalid inputs gracefully.
+- The final report, demo video, README, and live demo slides all match what was actually implemented.
+
