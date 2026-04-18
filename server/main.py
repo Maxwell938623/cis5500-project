@@ -13,12 +13,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(stations.router, prefix="/stations", tags=["stations"])
-app.include_router(fare_evasion.router, prefix="/fare-evasion", tags=["fare-evasion"])
-app.include_router(boroughs.router, prefix="/boroughs", tags=["boroughs"])
-app.include_router(trends.router, prefix="/trends", tags=["trends"])
-app.include_router(map_routes.router, prefix="/map", tags=["map"])
-app.include_router(metadata.router, prefix="/metadata", tags=["metadata"])
+app.include_router(stations, prefix="/stations", tags=["stations"])
+app.include_router(fare_evasion, prefix="/fare-evasion", tags=["fare-evasion"])
+app.include_router(boroughs, prefix="/boroughs", tags=["boroughs"])
+app.include_router(trends, prefix="/trends", tags=["trends"])
+app.include_router(map_routes, prefix="/map", tags=["map"])
+app.include_router(metadata, prefix="/metadata", tags=["metadata"])
 
 
 @app.get("/")

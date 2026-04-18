@@ -82,8 +82,8 @@ def get_station_risk_profile(
                 WITH station_fare_breakdown AS (
                     SELECT r.station_complex_id, r.station_complex, r.borough,
                         SUM(r.ridership) AS total_ridership,
-                        SUM(CASE WHEN fare_class_category ILIKE '%unlimited%' OR fare_class_category ILIKE '%full fare%' THEN ridership ELSE 0 END) AS full_fare_rides,
-                        SUM(CASE WHEN fare_class_category ILIKE '%reduced%' OR fare_class_category ILIKE '%student%' OR fare_class_category ILIKE '%senior%' THEN ridership ELSE 0 END) AS reduced_fare_rides
+                        SUM(CASE WHEN fare_class_category ILIKE '%%unlimited%%' OR fare_class_category ILIKE '%%full fare%%' THEN ridership ELSE 0 END) AS full_fare_rides,
+                        SUM(CASE WHEN fare_class_category ILIKE '%%reduced%%' OR fare_class_category ILIKE '%%student%%' OR fare_class_category ILIKE '%%senior%%' THEN ridership ELSE 0 END) AS reduced_fare_rides
                     FROM ridership r
                     {rid_where}
                     GROUP BY r.station_complex_id, r.station_complex, r.borough
@@ -91,7 +91,7 @@ def get_station_risk_profile(
                 station_risk AS (
                     SELECT sfd.*,
                         ROUND(100.0 * reduced_fare_rides / NULLIF(total_ridership, 0), 2) AS reduced_fare_pct,
-                        RANK() OVER (PARTITION BY borough ORDER BY 100.0 * reduced_fare_rides / NULLIF(total_ridership, 0) DESC) AS borough_rank,
+                        RANK() OVER (PARTITION BY sfd.borough ORDER BY 100.0 * reduced_fare_rides / NULLIF(total_ridership, 0) DESC) AS borough_rank,
                         sc.daytime_routes, sc.ada, sc.cbd, sc.structure
                     FROM station_fare_breakdown sfd
                     LEFT JOIN stationcoords sc ON sfd.station_complex_id::text = sc.complex_id::text
@@ -146,7 +146,7 @@ def get_station_detail(station_complex_id: str):
                 """
                 SELECT r.station_complex_id, r.station_complex, r.borough,
                     SUM(r.ridership) AS total_ridership,
-                    ROUND(100.0 * SUM(CASE WHEN fare_class_category ILIKE '%reduced%' OR fare_class_category ILIKE '%student%' OR fare_class_category ILIKE '%senior%' THEN ridership ELSE 0 END) / NULLIF(SUM(r.ridership), 0), 2) AS reduced_fare_pct,
+                    ROUND(100.0 * SUM(CASE WHEN fare_class_category ILIKE '%%reduced%%' OR fare_class_category ILIKE '%%student%%' OR fare_class_category ILIKE '%%senior%%' THEN ridership ELSE 0 END) / NULLIF(SUM(r.ridership), 0), 2) AS reduced_fare_pct,
                     sc.daytime_routes, sc.ada, sc.cbd, sc.structure,
                     sc.gtfs_latitude AS latitude, sc.gtfs_longitude AS longitude
                 FROM ridership r
