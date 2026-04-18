@@ -134,6 +134,12 @@ export default function BoroughEquity() {
     }));
   }, [intensityData]);
 
+  function toggleBorough(borough) {
+    setSelectedBoroughs((prev) =>
+      prev.includes(borough) ? prev.filter((b) => b !== borough) : [...prev, borough]
+    );
+  }
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -158,14 +164,39 @@ export default function BoroughEquity() {
         </div>
         <div className="filter-group">
           <label>Boroughs (multi-select)</label>
-          <select
-            multiple
-            value={selectedBoroughs}
-            onChange={(e) => setSelectedBoroughs([...e.target.selectedOptions].map((o) => o.value))}
-            style={{ height: 80 }}
-          >
-            {BOROUGHS.map((b) => <option key={b} value={b}>{b}</option>)}
-          </select>
+          <div className="multi-select-shell">
+            <div className="multi-select-header">
+              {selectedBoroughs.length ? `${selectedBoroughs.length} selected` : "All boroughs"}
+            </div>
+            <div className="multi-select-chips">
+              {BOROUGHS.map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  className={`multi-select-chip ${selectedBoroughs.includes(b) ? "is-selected" : ""}`}
+                  onClick={() => toggleBorough(b)}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+            <div className="multi-select-actions">
+              <button
+                type="button"
+                className="multi-select-link"
+                onClick={() => setSelectedBoroughs(BOROUGHS)}
+              >
+                Select All
+              </button>
+              <button
+                type="button"
+                className="multi-select-link"
+                onClick={() => setSelectedBoroughs([])}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
         </div>
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
@@ -181,7 +212,7 @@ export default function BoroughEquity() {
 
       {/* Borough metric cards */}
       {!loading.ridership && (
-        <div className="grid-5" style={{ marginBottom: 24 }}>
+        <div className="grid-5 ui-fade-in" style={{ marginBottom: 24 }}>
           {BOROUGHS.map((b) => (
             <MetricCard
               key={b}
@@ -201,22 +232,24 @@ export default function BoroughEquity() {
         {loading.ridership && <LoadingSpinner />}
         {errors.ridership && <ErrorMessage message={errors.ridership} onRetry={fetchAll} />}
         {!loading.ridership && !errors.ridership && (
-          <ResponsiveContainer width="100%" height={340}>
-            <BarChart data={ridershipPivoted} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="year" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
-              <YAxis
-                stroke="var(--text-secondary)"
-                tick={{ fill: "var(--text-secondary)", fontSize: 12 }}
-                tickFormatter={(v) => (v / 1_000_000).toFixed(0) + "M"}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ color: "var(--text-secondary)", fontSize: 12 }} />
-              {activeBoroughs.map((b) => (
-                <Bar key={b} dataKey={b} fill={BOROUGH_COLORS[b]} name={b} radius={[2, 2, 0, 0]} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="ui-fade-in">
+            <ResponsiveContainer width="100%" height={340}>
+              <BarChart data={ridershipPivoted} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="year" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
+                <YAxis
+                  stroke="var(--text-secondary)"
+                  tick={{ fill: "var(--text-secondary)", fontSize: 12 }}
+                  tickFormatter={(v) => (v / 1_000_000).toFixed(0) + "M"}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ color: "var(--text-secondary)", fontSize: 12 }} />
+                {activeBoroughs.map((b) => (
+                  <Bar key={b} dataKey={b} fill={BOROUGH_COLORS[b]} name={b} radius={[2, 2, 0, 0]} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </div>
 
@@ -228,19 +261,21 @@ export default function BoroughEquity() {
           {loading.ada && <LoadingSpinner />}
           {errors.ada && <ErrorMessage message={errors.ada} onRetry={fetchAll} />}
           {!loading.ada && !errors.ada && (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={adaData} layout="vertical" margin={{ top: 5, right: 20, left: 80, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                <XAxis type="number" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
-                <YAxis type="category" dataKey="borough" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} width={80} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="accessible_stations" name="Accessible Stations" radius={[0, 4, 4, 0]}>
-                  {adaData.map((entry) => (
-                    <Cell key={entry.borough} fill={BOROUGH_COLORS[entry.borough] || "#3b82f6"} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="ui-fade-in">
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={adaData} layout="vertical" margin={{ top: 5, right: 20, left: 80, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                  <XAxis type="number" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
+                  <YAxis type="category" dataKey="borough" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} width={80} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="accessible_stations" name="Accessible Stations" radius={[0, 4, 4, 0]}>
+                    {adaData.map((entry) => (
+                      <Cell key={entry.borough} fill={BOROUGH_COLORS[entry.borough] || "#3b82f6"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </div>
 
@@ -251,26 +286,28 @@ export default function BoroughEquity() {
           {loading.intensity && <LoadingSpinner />}
           {errors.intensity && <ErrorMessage message={errors.intensity} onRetry={fetchAll} />}
           {!loading.intensity && !errors.intensity && (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={intensityChartData} layout="vertical" margin={{ top: 5, right: 20, left: 80, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                <XAxis type="number" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
-                <YAxis type="category" dataKey="borough" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} width={80} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="avg_intensity" name="Avg Evaded / 100k Riders" radius={[0, 4, 4, 0]}>
-                  {intensityChartData.map((entry) => (
-                    <Cell key={entry.borough} fill={BOROUGH_COLORS[entry.borough] || "#f59e0b"} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="ui-fade-in">
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={intensityChartData} layout="vertical" margin={{ top: 5, right: 20, left: 80, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                  <XAxis type="number" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
+                  <YAxis type="category" dataKey="borough" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} width={80} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="avg_intensity" name="Avg Evaded / 100k Riders" radius={[0, 4, 4, 0]}>
+                    {intensityChartData.map((entry) => (
+                      <Cell key={entry.borough} fill={BOROUGH_COLORS[entry.borough] || "#f59e0b"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </div>
       </div>
 
       {/* Latest Year Intensity Table */}
       {!loading.intensity && !errors.intensity && latestIntensity.length > 0 && (
-        <div className="chart-container">
+        <div className="chart-container ui-fade-in">
           <div className="chart-title">Evasion Intensity Detail — Latest Year ({latestIntensity[0]?.year})</div>
           <div className="table-container" style={{ marginTop: 12 }}>
             <table>

@@ -204,7 +204,7 @@ export default function StationIndex() {
           {loading.detail && <LoadingSpinner message="Loading station details..." />}
           {errors.detail && <ErrorMessage message={errors.detail} />}
           {!loading.detail && stationDetail && (
-            <div className="grid-4">
+            <div className="grid-4 ui-fade-in">
               <MetricCard label="Total Ridership" value={fmtNum(stationDetail.total_ridership)} color="#3b82f6" />
               <MetricCard label="Reduced Fare %" value={fmtPct(stationDetail.reduced_fare_pct)} color="#f59e0b" />
               <MetricCard label="Borough" value={stationDetail.borough || "N/A"} />
@@ -240,7 +240,7 @@ export default function StationIndex() {
           {loading.risk && <LoadingSpinner />}
           {errors.risk && <ErrorMessage message={errors.risk} onRetry={fetchRisk} />}
           {!loading.risk && !errors.risk && (
-            <div className="table-container" style={{ marginTop: 12 }}>
+            <div className="table-container ui-fade-in" style={{ marginTop: 12 }}>
               <table>
                 <thead>
                   <tr>
@@ -317,43 +317,47 @@ export default function StationIndex() {
             <div className="chart-subtitle" style={{ marginBottom: 12 }}>By total ridership</div>
             {loading.busiest && <LoadingSpinner />}
             {errors.busiest && <ErrorMessage message={errors.busiest} />}
-            {!loading.busiest && !errors.busiest && busiestData.map((station, i) => (
-              <div
-                key={station.station_complex}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "10px 0",
-                  borderBottom: i < busiestData.length - 1 ? "1px solid var(--border)" : "none",
-                  cursor: "pointer",
-                }}
-                onClick={() => {
-                  setSearchQuery(station.station_complex);
-                  api.get("/stations/search", { params: { q: station.station_complex } }).then((res) => {
-                    const match = res.data.find((s) => s.station_complex === station.station_complex);
-                    if (match) handleSelectStation(match);
-                  }).catch(() => {});
-                }}
-              >
-                <div style={{
-                  width: 24, height: 24, borderRadius: 6,
-                  background: "var(--accent-light)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "0.75rem", fontWeight: 700, color: "var(--accent)", flexShrink: 0,
-                }}>
-                  {i + 1}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "0.8rem", fontWeight: 500, color: "var(--white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {station.station_complex}
+            {!loading.busiest && !errors.busiest && (
+              <div className="ui-fade-in">
+                {busiestData.map((station, i) => (
+                  <div
+                    key={station.station_complex}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "10px 0",
+                      borderBottom: i < busiestData.length - 1 ? "1px solid var(--border)" : "none",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => {
+                      setSearchQuery(station.station_complex);
+                      api.get("/stations/search", { params: { q: station.station_complex } }).then((res) => {
+                        const match = res.data.find((s) => s.station_complex === station.station_complex);
+                        if (match) handleSelectStation(match);
+                      }).catch(() => {});
+                    }}
+                  >
+                    <div style={{
+                      width: 24, height: 24, borderRadius: 6,
+                      background: "var(--accent-light)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "0.75rem", fontWeight: 700, color: "var(--accent)", flexShrink: 0,
+                    }}>
+                      {i + 1}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "0.8rem", fontWeight: 500, color: "var(--white)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {station.station_complex}
+                      </div>
+                      <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>
+                        {station.borough} &bull; {(Number(station.total_ridership) / 1_000_000).toFixed(1)}M rides
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>
-                    {station.borough} &bull; {(Number(station.total_ridership) / 1_000_000).toFixed(1)}M rides
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>

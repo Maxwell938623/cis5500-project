@@ -172,7 +172,7 @@ export default function FinancialImpact() {
 
       {/* Metric cards */}
       {!loading.revenue && !loading.quarterly && (
-        <div className="grid-3" style={{ marginBottom: 24 }}>
+        <div className="grid-3 ui-fade-in" style={{ marginBottom: 24 }}>
           <MetricCard
             label="Total Est. Revenue Lost"
             value={fmt(totalRevenueLost)}
@@ -199,37 +199,39 @@ export default function FinancialImpact() {
         {loading.quarterly && <LoadingSpinner />}
         {errors.quarterly && <ErrorMessage message={errors.quarterly} onRetry={fetchQuarterly} />}
         {!loading.quarterly && !errors.quarterly && quarterlyWithLabel.length > 0 && (
-          <ResponsiveContainer width="100%" height={320}>
-            <LineChart data={quarterlyWithLabel} margin={{ top: 10, right: 30, left: 20, bottom: 60 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis
-                dataKey="label"
-                stroke="var(--text-secondary)"
-                tick={{ fill: "var(--text-secondary)", fontSize: 11 }}
-                angle={-45}
-                textAnchor="end"
-                height={60}
-              />
-              <YAxis
-                stroke="var(--text-secondary)"
-                tick={{ fill: "var(--text-secondary)", fontSize: 12 }}
-                tickFormatter={(v) => `${v}%`}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ color: "var(--text-secondary)", fontSize: 12 }} />
-              <ReferenceLine y={0} stroke="var(--border)" />
-              <Line
-                type="monotone"
-                dataKey="evasion_pct"
-                stroke="#3b82f6"
-                strokeWidth={2.5}
-                dot={{ r: 3 }}
-                name="Evasion Rate (%)"
-              >
-                <ErrorBar dataKey="errorVal" width={4} strokeWidth={1.5} stroke="#60a5fa" opacity={0.6} />
-              </Line>
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="ui-fade-in">
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={quarterlyWithLabel} margin={{ top: 10, right: 30, left: 20, bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis
+                  dataKey="label"
+                  stroke="var(--text-secondary)"
+                  tick={{ fill: "var(--text-secondary)", fontSize: 11 }}
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
+                />
+                <YAxis
+                  stroke="var(--text-secondary)"
+                  tick={{ fill: "var(--text-secondary)", fontSize: 12 }}
+                  tickFormatter={(v) => `${v}%`}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ color: "var(--text-secondary)", fontSize: 12 }} />
+                <ReferenceLine y={0} stroke="var(--border)" />
+                <Line
+                  type="monotone"
+                  dataKey="evasion_pct"
+                  stroke="#3b82f6"
+                  strokeWidth={2.5}
+                  dot={{ r: 3 }}
+                  name="Evasion Rate (%)"
+                >
+                  <ErrorBar dataKey="errorVal" width={4} strokeWidth={1.5} stroke="#60a5fa" opacity={0.6} />
+                </Line>
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </div>
 
@@ -240,7 +242,7 @@ export default function FinancialImpact() {
         {loading.revenue && <LoadingSpinner />}
         {errors.revenue && <ErrorMessage message={errors.revenue} onRetry={fetchRevenue} />}
         {!loading.revenue && !errors.revenue && revenueData.length > 0 && (
-          <>
+          <div className="ui-fade-in">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart
                 data={revenueData.map((r) => ({ ...r, label: `${r.year} Q${r.quarter}` }))}
@@ -311,7 +313,7 @@ export default function FinancialImpact() {
                 </tbody>
               </table>
             </div>
-          </>
+          </div>
         )}
       </div>
 
@@ -322,29 +324,31 @@ export default function FinancialImpact() {
         {loading.payment && <LoadingSpinner />}
         {errors.payment && <ErrorMessage message={errors.payment} onRetry={fetchPayment} />}
         {!loading.payment && !errors.payment && paymentPivoted.length > 0 && (
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={paymentPivoted} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="borough" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
-              <YAxis
-                stroke="var(--text-secondary)"
-                tick={{ fill: "var(--text-secondary)", fontSize: 12 }}
-                tickFormatter={(v) => `${v}%`}
-                domain={[0, 100]}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ color: "var(--text-secondary)", fontSize: 12 }} />
-              {paymentMethods.map((method, i) => (
-                <Bar
-                  key={method}
-                  dataKey={method}
-                  stackId="a"
-                  fill={PAYMENT_COLORS[i % PAYMENT_COLORS.length]}
-                  name={method}
+          <div className="ui-fade-in">
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={paymentPivoted} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="borough" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
+                <YAxis
+                  stroke="var(--text-secondary)"
+                  tick={{ fill: "var(--text-secondary)", fontSize: 12 }}
+                  tickFormatter={(v) => `${v}%`}
+                  domain={[0, 100]}
                 />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ color: "var(--text-secondary)", fontSize: 12 }} />
+                {paymentMethods.map((method, i) => (
+                  <Bar
+                    key={method}
+                    dataKey={method}
+                    stackId="a"
+                    fill={PAYMENT_COLORS[i % PAYMENT_COLORS.length]}
+                    name={method}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </div>
     </div>

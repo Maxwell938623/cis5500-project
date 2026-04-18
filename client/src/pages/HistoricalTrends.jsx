@@ -103,7 +103,7 @@ export default function HistoricalTrends() {
 
       {/* Metric cards */}
       {!loading && !error && latestYear && (
-        <div className="grid-4" style={{ marginBottom: 24 }}>
+        <div className="grid-4 ui-fade-in" style={{ marginBottom: 24 }}>
           <MetricCard
             label={`Total Ridership (${latestYear.year})`}
             value={fmt(totalRidership)}
@@ -133,7 +133,7 @@ export default function HistoricalTrends() {
       {error && <ErrorMessage message={error} onRetry={fetchData} />}
 
       {!loading && !error && data.length > 0 && (
-        <>
+        <div className="ui-fade-in">
           {/* Ridership Chart */}
           <div className="chart-container">
             <div className="chart-title">Annual Ridership Over Time</div>
@@ -260,11 +260,11 @@ export default function HistoricalTrends() {
               </table>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {!loading && !error && data.length === 0 && (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-secondary)" }}>
+        <div className="ui-fade-in" style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-secondary)" }}>
           No data found for the selected filters.
         </div>
       )}

@@ -95,7 +95,7 @@ export default function GeoMap() {
 
       {/* Metrics */}
       {!loading && !error && (
-        <div className="grid-3" style={{ marginBottom: 20 }}>
+        <div className="grid-3 ui-fade-in" style={{ marginBottom: 20 }}>
           <MetricCard label="Stations Shown" value={stations.length} color="#3b82f6" />
           <MetricCard label="Boroughs" value={boroughCount} color="#10b981" />
           <MetricCard
@@ -111,7 +111,7 @@ export default function GeoMap() {
       {error && <ErrorMessage message={error} onRetry={fetchStations} />}
 
       {!loading && !error && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 20 }}>
+        <div className="ui-fade-in" style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 20 }}>
           {/* Map */}
           <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)" }}>
             <MapContainer

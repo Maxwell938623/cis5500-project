@@ -57,6 +57,7 @@ export default function Navbar() {
             <NavLink
               key={item.to}
               to={item.to}
+              className="nav-link"
               style={({ isActive }) => ({
                 padding: "6px 14px",
                 borderRadius: 8,
@@ -65,7 +66,6 @@ export default function Navbar() {
                 color: isActive ? "var(--white)" : "var(--text-secondary)",
                 background: isActive ? "var(--accent-light)" : "transparent",
                 border: isActive ? "1px solid var(--accent)" : "1px solid transparent",
-                transition: "all 0.15s",
                 textDecoration: "none",
               })}
             >

@@ -3,6 +3,7 @@ import React from "react";
 export default function ErrorMessage({ message, onRetry }) {
   return (
     <div
+      className="ui-fade-in"
       style={{
         display: "flex",
         flexDirection: "column",
