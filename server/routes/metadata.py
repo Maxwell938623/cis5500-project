@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from database import get_db_connection
+from .sql_common import STATION_META_CTE
 
 router = APIRouter()
 
@@ -10,7 +11,13 @@ def get_boroughs():
         with get_db_connection() as conn:
             cur = conn.cursor()
             cur.execute(
-                "SELECT DISTINCT borough FROM ridership WHERE borough IS NOT NULL ORDER BY borough"
+                f"""
+                WITH {STATION_META_CTE}
+                SELECT DISTINCT borough
+                FROM station_meta
+                WHERE borough IS NOT NULL
+                ORDER BY borough
+                """
             )
             rows = cur.fetchall()
             return [r["borough"] for r in rows]
@@ -30,38 +37,6 @@ def get_lines():
             )
             rows = cur.fetchall()
             return [r["daytime_routes"] for r in rows]
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Query failed: {e}")
-
-
-@router.get("/payment-methods")
-def get_payment_methods():
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            cur.execute(
-                "SELECT DISTINCT payment_method FROM ridership WHERE payment_method IS NOT NULL ORDER BY payment_method"
-            )
-            rows = cur.fetchall()
-            return [r["payment_method"] for r in rows]
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Query failed: {e}")
-
-
-@router.get("/fare-categories")
-def get_fare_categories():
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            cur.execute(
-                "SELECT DISTINCT fare_class_category FROM ridership WHERE fare_class_category IS NOT NULL ORDER BY fare_class_category"
-            )
-            rows = cur.fetchall()
-            return [r["fare_class_category"] for r in rows]
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:

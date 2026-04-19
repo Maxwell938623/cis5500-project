@@ -6,7 +6,6 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 import MetricCard from "../components/MetricCard";
 
-// Fix leaflet icon issue with CRA
 import L from "leaflet";
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -36,15 +35,16 @@ export default function GeoMap() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [borough, setBorough] = useState("");
-  const [topK, setTopK] = useState("5");
+  const [year, setYear] = useState("2024");
+  const [topK, setTopK] = useState(5);
 
   const fetchStations = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const params = {};
-      if (topK !== "all") params.top_k = Number(topK);
+      const params = { top_k: topK };
       if (borough) params.borough = borough;
+      if (year) params.year = Number(year);
       const res = await api.get("/map/top-non-cbd-stations", { params });
       setStations(res.data);
     } catch (err) {
@@ -52,7 +52,7 @@ export default function GeoMap() {
     } finally {
       setLoading(false);
     }
-  }, [borough, topK]);
+  }, [borough, topK, year]);
 
   useEffect(() => { fetchStations(); }, []);
 
@@ -61,6 +61,7 @@ export default function GeoMap() {
     : 1;
 
   const totalRidership = stations.reduce((s, r) => s + Number(r.total_ridership || 0), 0);
+  const totalArrests = stations.reduce((s, r) => s + Number(r.total_arrests || 0), 0);
   const boroughCount = [...new Set(stations.map((s) => s.borough))].length;
 
   const validStations = stations.filter(
@@ -72,7 +73,7 @@ export default function GeoMap() {
     <div className="page-container">
       <div className="page-header">
         <h1>Geospatial Station Map</h1>
-        <p>Top ridership stations by borough, circle size reflects total ridership</p>
+        <p>Top stations per borough, circle size reflects total ridership, color reflects borough</p>
       </div>
 
       <div className="filters-bar">
@@ -83,10 +84,18 @@ export default function GeoMap() {
           </select>
         </div>
         <div className="filter-group">
+          <label>Year</label>
+          <input
+            type="number" placeholder="e.g. 2024"
+            value={year} onChange={(e) => setYear(e.target.value)}
+            min="2020" max="2024" style={{ width: 110 }}
+          />
+        </div>
+        <div className="filter-group">
           <label>Top Stations per Borough</label>
-          <select value={topK} onChange={(e) => setTopK(e.target.value)}>
-            {["3", "5", "10", "15", "20", "25", "30", "40", "50", "75", "100", "all"].map((n) => (
-              <option key={n} value={n}>{n === "all" ? "All" : n}</option>
+          <select value={topK} onChange={(e) => setTopK(Number(e.target.value))}>
+            {[3, 5, 10, 15, 20, 25, 30, 40, 50].map((n) => (
+              <option key={n} value={n}>{n}</option>
             ))}
           </select>
         </div>
@@ -98,14 +107,20 @@ export default function GeoMap() {
 
       {/* Metrics */}
       {!loading && !error && (
-        <div className="grid-3 ui-fade-in" style={{ marginBottom: 20 }}>
+        <div className="grid-4 ui-fade-in" style={{ marginBottom: 20 }}>
           <MetricCard label="Stations Shown" value={stations.length} color="#3b82f6" />
           <MetricCard label="Boroughs" value={boroughCount} color="#10b981" />
           <MetricCard
             label="Total Ridership"
-            value={(totalRidership / 1_000_000).toFixed(1) + "M"}
+            value={`${(totalRidership / 1_000_000).toFixed(1)}M`}
             subValue="across shown stations"
             color="#f59e0b"
+          />
+          <MetricCard
+            label="Total Arrests"
+            value={fmtNum(totalArrests)}
+            subValue="across shown stations"
+            color="#ef4444"
           />
         </div>
       )}
@@ -145,19 +160,22 @@ export default function GeoMap() {
                       color: "var(--text-primary)",
                       borderRadius: 8,
                       padding: "10px 26px 10px 10px",
-                      minWidth: 200,
+                      minWidth: 220,
                       fontSize: "0.875rem",
                     }}>
                       <div style={{ fontWeight: 700, color: BOROUGH_COLORS[station.borough] || "white", marginBottom: 6 }}>
                         {station.station_complex}
                       </div>
                       <div style={{ marginBottom: 4 }}>
-                        <span style={{ color: "#94a3b8" }}>Borough: </span>
-                        {station.borough}
+                        <span style={{ color: "#94a3b8" }}>Borough: </span>{station.borough}
                       </div>
                       <div style={{ marginBottom: 4 }}>
                         <span style={{ color: "#94a3b8" }}>Ridership: </span>
                         <strong>{fmtNum(station.total_ridership)}</strong>
+                      </div>
+                      <div style={{ marginBottom: 4 }}>
+                        <span style={{ color: "#94a3b8" }}>Arrests: </span>
+                        <strong>{fmtNum(station.total_arrests)}</strong>
                       </div>
                       <div>
                         <span style={{ color: "#94a3b8" }}>Borough Rank: </span>
@@ -197,12 +215,9 @@ export default function GeoMap() {
                 }}
               >
                 <div style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
+                  width: 10, height: 10, borderRadius: "50%",
                   background: BOROUGH_COLORS[station.borough] || "#64748b",
-                  marginTop: 4,
-                  flexShrink: 0,
+                  marginTop: 4, flexShrink: 0,
                 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 500, fontSize: "0.8rem", color: "var(--white)" }}>
@@ -213,6 +228,9 @@ export default function GeoMap() {
                   </div>
                   <div style={{ fontSize: "0.7rem", color: "var(--accent)", marginTop: 2, fontWeight: 500 }}>
                     {(Number(station.total_ridership) / 1_000_000).toFixed(2)}M rides
+                  </div>
+                  <div style={{ fontSize: "0.7rem", color: "#ef4444", marginTop: 1 }}>
+                    {fmtNum(station.total_arrests)} arrests
                   </div>
                 </div>
               </div>
@@ -229,4 +247,3 @@ export default function GeoMap() {
     </div>
   );
 }
-

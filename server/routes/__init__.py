@@ -4,3 +4,4 @@ from .boroughs import router as boroughs
 from .trends import router as trends
 from .map import router as map
 from .metadata import router as metadata
+from .arrests import router as arrests

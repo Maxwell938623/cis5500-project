@@ -1,0 +1,143 @@
+-- ==========================================
+-- 1. Arrests NYPD Data
+-- ==========================================
+CREATE TABLE arrestsNYPDDataframe (
+    ARREST_KEY BIGINT PRIMARY KEY,
+    PD_CD BIGINT,
+    PD_DESC VARCHAR,
+    LAW_CAT_CD VARCHAR,
+    JURISDICTION_CODE BIGINT,
+    AGE_GROUP VARCHAR,
+    PERP_SEX VARCHAR,
+    PERP_RACE VARCHAR,
+    Latitude DOUBLE PRECISION,
+    Longitude DOUBLE PRECISION,
+    year INTEGER,
+    month INTEGER,
+    station_complex_id VARCHAR
+    -- Note: Since the exact target table/column for the FKEY wasn't explicitly
+    -- flagged as a PKEY in the other tables, you can add the strict constraint like this:
+    -- FOREIGN KEY (station_complex_id) REFERENCES other_table(column_name)
+);
+
+-- ==========================================
+-- 2. Station Coordinates Data
+-- ==========================================
+CREATE TABLE stationCoordsDataframe (
+    "GTFS Stop ID" VARCHAR,
+    "Station ID" VARCHAR,
+    "Complex ID" BIGINT,
+    "Division" VARCHAR,
+    "Line" VARCHAR,
+    "Stop Name" VARCHAR,
+    "Borough" VARCHAR,
+    "CBD" BOOLEAN,
+    "Daytime Routes" VARCHAR,
+    "Structure" VARCHAR,
+    "GTFS Latitude" DOUBLE PRECISION,
+    "GTFS Longitude" DOUBLE PRECISION,
+    "North Direction Label" VARCHAR,
+    "South Direction Label" VARCHAR,
+    "ADA" BIGINT,
+    "ADA Northbound" BOOLEAN,
+    "ADA Southbound" BOOLEAN
+);
+
+-- ==========================================
+-- 3. Fare Evasion Stats Data
+-- ==========================================
+CREATE TABLE fairEvasionStatsDataframe (
+    "Fare Evasion" REAL,     -- float32 maps to REAL in Postgres
+    "Margin of Error" REAL,
+    year BIGINT,
+    quarter BIGINT
+);
+
+-- ==========================================
+-- 4. Ridership Dataframes (2020 - 2024)
+-- ==========================================
+
+-- 2020
+CREATE TABLE ridership2020Dataframe (
+    station_complex_id VARCHAR,
+    year BIGINT,
+    quarter BIGINT,
+    ridership BIGINT,
+    transfers BIGINT,
+    transit_timestamp_millis BIGINT
+);
+
+CREATE TABLE ridership2020UselessDataframe (
+    station_complex_id VARCHAR,
+    transit_mode VARCHAR,
+    station_complex VARCHAR,
+    borough VARCHAR
+);
+
+-- 2021
+CREATE TABLE ridership2021Dataframe (
+    station_complex_id VARCHAR,
+    year BIGINT,
+    quarter BIGINT,
+    ridership BIGINT,
+    transfers BIGINT,
+    transit_timestamp_millis BIGINT
+);
+
+CREATE TABLE ridership2021UselessDataframe (
+    station_complex_id VARCHAR,
+    transit_mode VARCHAR,
+    station_complex VARCHAR,
+    borough VARCHAR
+);
+
+-- 2022
+CREATE TABLE ridership2022Dataframe (
+    station_complex_id VARCHAR,
+    year BIGINT,
+    quarter BIGINT,
+    ridership BIGINT,
+    transfers BIGINT,
+    transit_timestamp_millis BIGINT
+);
+
+CREATE TABLE ridership2022UselessDataframe (
+    station_complex_id VARCHAR,
+    transit_mode VARCHAR,
+    station_complex VARCHAR,
+    borough VARCHAR
+);
+
+-- 2023
+CREATE TABLE ridership2023Dataframe (
+    station_complex_id VARCHAR,
+    year BIGINT,
+    quarter BIGINT,
+    ridership BIGINT,
+    transfers BIGINT,
+    transit_timestamp_millis BIGINT
+);
+
+CREATE TABLE ridership2023UselessDataframe (
+    station_complex_id VARCHAR,
+    transit_mode VARCHAR,
+    station_complex VARCHAR,
+    borough VARCHAR
+);
+
+-- 2024
+CREATE TABLE ridership2024Dataframe (
+    station_complex_id VARCHAR,
+    year BIGINT,
+    quarter BIGINT,
+    ridership BIGINT,
+    transfers BIGINT,
+    transit_timestamp_millis BIGINT
+);
+
+CREATE TABLE ridership2024UselessDataframe (
+    station_complex_id VARCHAR,
+    transit_mode VARCHAR,
+    station_complex VARCHAR,
+    borough VARCHAR
+);

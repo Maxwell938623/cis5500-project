@@ -31,21 +31,18 @@ export default function Navbar() {
       }}>
         {/* Logo */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
+          <img
+            src="/5500_logo.png"
+            alt="NYC Subway Analytics logo"
+            style={{
             width: 32,
             height: 32,
-            background: "var(--accent)",
             borderRadius: 8,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "1.1rem",
-            fontWeight: 700,
-            color: "white",
+            objectFit: "cover",
             flexShrink: 0,
-          }}>
-            M
-          </div>
+            display: "block",
+          }}
+          />
           <span style={{ fontWeight: 700, fontSize: "1rem", color: "var(--white)" }}>
             NYC Subway Analytics
           </span>

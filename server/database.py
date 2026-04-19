@@ -12,7 +12,8 @@ DB_CONFIG = {
     "dbname": os.getenv("DB_NAME"),
     "user": os.getenv("DB_USER"),
     "password": os.getenv("DB_PASSWORD"),
-    "connect_timeout": 10,
+    "connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", 600)),
+    "options": os.getenv("DB_OPTIONS", "-c statement_timeout=600000"),
 }
 
 

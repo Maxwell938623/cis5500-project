@@ -1,87 +1,26 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 from database import get_db_connection
+from .sql_common import RIDERSHIP_ALL_CTE, STATION_META_CTE
 
 router = APIRouter()
 
 
-@router.get("/ridership-by-year")
-def get_ridership_by_year(
-    borough: Optional[str] = Query(None),
-    year_start: Optional[int] = Query(None),
-    year_end: Optional[int] = Query(None),
-):
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            conditions = ["borough IS NOT NULL"]
-            params = []
-            if borough:
-                conditions.append("borough ILIKE %s")
-                params.append(borough)
-            if year_start is not None:
-                conditions.append("year >= %s")
-                params.append(year_start)
-            if year_end is not None:
-                conditions.append("year <= %s")
-                params.append(year_end)
-
-            where_clause = " AND ".join(conditions)
-            sql = f"""
-                SELECT borough, year, SUM(ridership) AS total_ridership
-                FROM ridership
-                WHERE {where_clause}
-                GROUP BY borough, year
-                ORDER BY borough, year
-            """
-            cur.execute(sql, params)
-            rows = cur.fetchall()
-            return [dict(r) for r in rows]
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Query failed: {e}")
-
-
 @router.get("/ada-stations")
-def get_ada_stations(borough: Optional[str] = Query(None)):
+def get_ada_stations():
+    """Query 5: ADA-Accessible Stations per Borough"""
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
-            # borough param for stationcoords uses abbreviations; map full name -> abbrev if needed
-            borough_map = {
-                "brooklyn": "Bk",
-                "bronx": "Bx",
-                "manhattan": "M",
-                "queens": "Q",
-                "staten island": "SI",
-            }
-
-            conditions = ["ada IS TRUE"]
-            params = []
-            if borough:
-                mapped = borough_map.get(borough.lower(), borough)
-                conditions.append("borough = %s")
-                params.append(mapped)
-
-            where_clause = " AND ".join(conditions)
-            sql = f"""
-                SELECT
-                    CASE borough
-                        WHEN 'Bk' THEN 'Brooklyn'
-                        WHEN 'Bx' THEN 'Bronx'
-                        WHEN 'M'  THEN 'Manhattan'
-                        WHEN 'Q'  THEN 'Queens'
-                        WHEN 'SI' THEN 'Staten Island'
-                        ELSE borough
-                    END AS borough,
-                    COUNT(DISTINCT complex_id) AS accessible_stations
-                FROM stationcoords
-                WHERE {where_clause}
-                GROUP BY borough
+            cur.execute(
+                """
+                SELECT sc.borough, COUNT(*) AS accessible_stations
+                FROM stationcoords sc
+                WHERE sc.ADA = TRUE
+                GROUP BY sc.borough
                 ORDER BY accessible_stations DESC
-            """
-            cur.execute(sql, params)
+                """
+            )
             rows = cur.fetchall()
             return [dict(r) for r in rows]
     except RuntimeError as e:
@@ -90,36 +29,42 @@ def get_ada_stations(borough: Optional[str] = Query(None)):
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
 
 
-@router.get("/payment-share")
-def get_payment_share(
+@router.get("/demographic-arrests")
+def get_demographic_arrests(
     borough: Optional[str] = Query(None),
-    payment_method: Optional[str] = Query(None),
     year: Optional[int] = Query(None),
 ):
+    """Query 4: Demographic Breakdown of Arrests by Borough"""
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
-            conditions = ["borough IS NOT NULL"]
+            target_year = year
+            if target_year is None:
+                cur.execute("SELECT MAX(year)::int AS max_year FROM arrestsnypddataframe WHERE year IS NOT NULL")
+                row = cur.fetchone()
+                target_year = row["max_year"] if row else None
+            if target_year is None:
+                return []
+
+            conditions = ["sm.borough IS NOT NULL"]
             params = []
             if borough:
-                conditions.append("borough ILIKE %s")
+                conditions.append("sm.borough ILIKE %s")
                 params.append(borough)
-            if payment_method:
-                conditions.append("payment_method ILIKE %s")
-                params.append(payment_method)
-            if year is not None:
-                conditions.append("year = %s")
-                params.append(year)
+            if target_year is not None:
+                conditions.append("a.year = %s")
+                params.append(target_year)
 
             where_clause = " AND ".join(conditions)
             sql = f"""
-                SELECT borough, payment_method,
-                    SUM(ridership) AS total_ridership,
-                    ROUND(100.0 * SUM(ridership) / SUM(SUM(ridership)) OVER (PARTITION BY borough), 2) AS pct_of_borough
-                FROM ridership
+                WITH {STATION_META_CTE}
+                SELECT sm.borough, a.AGE_GROUP, a.PERP_RACE,
+                       COUNT(*) AS arrest_count
+                FROM arrestsnypddataframe a
+                JOIN station_meta sm ON a.station_complex_id = sm.station_complex_id
                 WHERE {where_clause}
-                GROUP BY borough, payment_method
-                ORDER BY borough, total_ridership DESC
+                GROUP BY sm.borough, a.AGE_GROUP, a.PERP_RACE
+                ORDER BY sm.borough, arrest_count DESC
             """
             cur.execute(sql, params)
             rows = cur.fetchall()
@@ -130,52 +75,80 @@ def get_payment_share(
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
 
 
-@router.get("/evasion-intensity")
-def get_evasion_intensity(
-    borough: Optional[str] = Query(None),
-    year_start: Optional[int] = Query(None),
-    year_end: Optional[int] = Query(None),
-):
+@router.get("/enforcement-disparity")
+def get_enforcement_disparity(year: Optional[int] = Query(None)):
+    """Query 8: Borough Enforcement Disparity — Arrests vs. Estimated Evasion Volume"""
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
-            br_conditions = ["r.borough IS NOT NULL"]
-            br_params = []
-            if borough:
-                br_conditions.append("r.borough ILIKE %s")
-                br_params.append(borough)
-            if year_start is not None:
-                br_conditions.append("r.year >= %s")
-                br_params.append(year_start)
-            if year_end is not None:
-                br_conditions.append("r.year <= %s")
-                br_params.append(year_end)
-
-            br_where = " AND ".join(br_conditions)
-            sql = f"""
-                WITH borough_ridership AS (
-                    SELECT r.borough, r.year, SUM(r.ridership) AS paid_rides
-                    FROM ridership r
-                    WHERE {br_where}
-                    GROUP BY r.borough, r.year
-                ),
-                borough_evasion_est AS (
-                    SELECT br.borough, br.year, br.paid_rides, fe_avg.avg_evasion_rate,
-                        ROUND(br.paid_rides / NULLIF(1 - fe_avg.avg_evasion_rate, 0) * fe_avg.avg_evasion_rate) AS est_evaded_rides
-                    FROM borough_ridership br
-                    JOIN (
-                        SELECT year, AVG(fare_evasion) AS avg_evasion_rate
-                        FROM fareevasionstats
-                        WHERE fare_evasion IS NOT NULL
-                        GROUP BY year
-                    ) fe_avg ON br.year = fe_avg.year
+            target_year = year
+            if target_year is None:
+                cur.execute(
+                    f"""
+                    WITH {RIDERSHIP_ALL_CTE}
+                    SELECT MAX(year)::int AS max_year
+                    FROM ridership_all
+                    WHERE year IS NOT NULL
+                    """
                 )
-                SELECT borough, year, paid_rides, est_evaded_rides,
-                    ROUND(100000.0 * est_evaded_rides / NULLIF(paid_rides, 0), 2) AS est_evaded_per_100k_riders
-                FROM borough_evasion_est
-                ORDER BY year DESC, est_evaded_per_100k_riders DESC
+                row = cur.fetchone()
+                target_year = row["max_year"] if row else None
+            if target_year is None:
+                return []
+
+            yr_cond_r = ""
+            yr_cond_fe = ""
+            yr_cond_a = ""
+            params = []
+            if target_year is not None:
+                yr_cond_r = "AND r.year = %s"
+                yr_cond_fe = "AND year = %s"
+                yr_cond_a = "AND a.year = %s"
+                params = [target_year, target_year, target_year]
+
+            sql = f"""
+                WITH {RIDERSHIP_ALL_CTE},
+                {STATION_META_CTE},
+                borough_ridership AS (
+                    SELECT sm.borough, r.year, SUM(r.ridership) AS paid_rides
+                    FROM ridership_all r
+                    JOIN station_meta sm ON r.station_complex_id = sm.station_complex_id
+                    WHERE sm.borough IS NOT NULL {yr_cond_r}
+                    GROUP BY sm.borough, r.year
+                ),
+                annual_evasion AS (
+                    SELECT year, AVG(fare_evasion) AS avg_evasion_rate
+                    FROM fareevasionstats
+                    WHERE fare_evasion IS NOT NULL {yr_cond_fe}
+                    GROUP BY year
+                ),
+                borough_est_evasion AS (
+                    SELECT br.borough, br.year, br.paid_rides, ae.avg_evasion_rate,
+                           ROUND(br.paid_rides / NULLIF(1 - ae.avg_evasion_rate, 0)
+                                 * ae.avg_evasion_rate) AS est_evaded_rides
+                    FROM borough_ridership br
+                    JOIN annual_evasion ae ON br.year = ae.year
+                ),
+                borough_arrests AS (
+                    SELECT sm.borough, a.year, COUNT(*) AS total_arrests
+                    FROM arrestsnypddataframe a
+                    JOIN station_meta sm ON a.station_complex_id = sm.station_complex_id
+                    WHERE sm.borough IS NOT NULL {yr_cond_a}
+                    GROUP BY sm.borough, a.year
+                )
+                SELECT
+                    be.borough,
+                    be.year,
+                    be.est_evaded_rides,
+                    COALESCE(ba.total_arrests, 0)                                         AS total_arrests,
+                    ROUND(100.0 * COALESCE(ba.total_arrests, 0)
+                          / NULLIF(be.est_evaded_rides, 0), 4)                           AS arrest_to_evasion_ratio
+                FROM borough_est_evasion be
+                LEFT JOIN borough_arrests ba
+                    ON be.borough = ba.borough AND be.year = ba.year
+                ORDER BY be.year DESC, arrest_to_evasion_ratio DESC
             """
-            cur.execute(sql, br_params)
+            cur.execute(sql, params)
             rows = cur.fetchall()
             return [dict(r) for r in rows]
     except RuntimeError as e:

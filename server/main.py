@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routes import stations, fare_evasion, boroughs, trends, map as map_routes, metadata
+from routes import stations, fare_evasion, boroughs, trends, map as map_routes, metadata, arrests
 
 app = FastAPI(title="NYC Subway Fare Evasion Analytics API", version="1.0.0")
 
@@ -19,6 +19,7 @@ app.include_router(boroughs, prefix="/boroughs", tags=["boroughs"])
 app.include_router(trends, prefix="/trends", tags=["trends"])
 app.include_router(map_routes, prefix="/map", tags=["map"])
 app.include_router(metadata, prefix="/metadata", tags=["metadata"])
+app.include_router(arrests, prefix="/arrests", tags=["arrests"])
 
 
 @app.get("/")

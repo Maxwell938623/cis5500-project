@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, Cell,
@@ -16,10 +16,17 @@ const BOROUGH_COLORS = {
   "Staten Island": "#8b5cf6",
 };
 
+const CHARGE_COLORS = {
+  F: "#ef4444",
+  M: "#f59e0b",
+  V: "#10b981",
+};
+
 const BOROUGHS = ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"];
+const VALID_CHARGE_TYPES = ["F", "M", "V"];
 
 function fmt(n) { return n != null ? Number(n).toLocaleString() : "N/A"; }
-function fmtPct(n) { return n != null ? `${Number(n).toFixed(2)}%` : "N/A"; }
+function fmtRatio(n) { return n != null ? `${Number(n).toFixed(4)}%` : "N/A"; }
 
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
@@ -36,34 +43,17 @@ function CustomTooltip({ active, payload, label }) {
 }
 
 export default function BoroughEquity() {
-  const [ridershipData, setRidershipData] = useState([]);
   const [adaData, setAdaData] = useState([]);
-  const [intensityData, setIntensityData] = useState([]);
-  const [loading, setLoading] = useState({ ridership: true, ada: true, intensity: true });
+  const [chargeData, setChargeData] = useState([]);
+  const [demographicData, setDemographicData] = useState([]);
+  const [disparityData, setDisparityData] = useState([]);
+  const [loading, setLoading] = useState({ ada: true, charge: true, demographic: true, disparity: true });
   const [errors, setErrors] = useState({});
-  const [yearStart, setYearStart] = useState("");
-  const [yearEnd, setYearEnd] = useState("");
-  const [selectedBoroughsDraft, setSelectedBoroughsDraft] = useState([]);
-  const [selectedBoroughsApplied, setSelectedBoroughsApplied] = useState([]);
+  const [selectedBorough, setSelectedBorough] = useState("");
+  const [year, setYear] = useState("2024");
+  const [disparityYear, setDisparityYear] = useState("");
 
-  const fetchAll = useCallback(async () => {
-    const params = {};
-    if (yearStart) params.year_start = yearStart;
-    if (yearEnd) params.year_end = yearEnd;
-
-    // Ridership by year
-    setLoading((l) => ({ ...l, ridership: true }));
-    try {
-      const res = await api.get("/boroughs/ridership-by-year", { params });
-      setRidershipData(res.data);
-      setErrors((e) => ({ ...e, ridership: null }));
-    } catch (err) {
-      setErrors((e) => ({ ...e, ridership: err.message }));
-    } finally {
-      setLoading((l) => ({ ...l, ridership: false }));
-    }
-
-    // ADA stations
+  const fetchAda = useCallback(async () => {
     setLoading((l) => ({ ...l, ada: true }));
     try {
       const res = await api.get("/boroughs/ada-stations");
@@ -74,195 +64,159 @@ export default function BoroughEquity() {
     } finally {
       setLoading((l) => ({ ...l, ada: false }));
     }
+  }, []);
 
-    // Evasion intensity
-    setLoading((l) => ({ ...l, intensity: true }));
+  const fetchCharge = useCallback(async () => {
+    setLoading((l) => ({ ...l, charge: true }));
     try {
-      const res = await api.get("/boroughs/evasion-intensity", { params });
-      setIntensityData(res.data);
-      setErrors((e) => ({ ...e, intensity: null }));
+      const params = {};
+      if (year) params.year = Number(year);
+      const res = await api.get("/arrests/by-charge-year", { params });
+      setChargeData(res.data);
+      setErrors((e) => ({ ...e, charge: null }));
     } catch (err) {
-      setErrors((e) => ({ ...e, intensity: err.message }));
+      setErrors((e) => ({ ...e, charge: err.message }));
     } finally {
-      setLoading((l) => ({ ...l, intensity: false }));
+      setLoading((l) => ({ ...l, charge: false }));
     }
-  }, [yearStart, yearEnd]);
+  }, [year]);
 
-  useEffect(() => { fetchAll(); }, []);
+  const fetchDemographic = useCallback(async () => {
+    setLoading((l) => ({ ...l, demographic: true }));
+    try {
+      const params = {};
+      if (selectedBorough) params.borough = selectedBorough;
+      if (year) params.year = Number(year);
+      const res = await api.get("/boroughs/demographic-arrests", { params });
+      setDemographicData(res.data);
+      setErrors((e) => ({ ...e, demographic: null }));
+    } catch (err) {
+      setErrors((e) => ({ ...e, demographic: err.message }));
+    } finally {
+      setLoading((l) => ({ ...l, demographic: false }));
+    }
+  }, [selectedBorough, year]);
 
-  // Pivot ridership data for grouped bar chart: [{year, Manhattan, Brooklyn, ...}]
-  const ridershipPivoted = React.useMemo(() => {
+  const fetchDisparity = useCallback(async () => {
+    setLoading((l) => ({ ...l, disparity: true }));
+    try {
+      const params = {};
+      if (disparityYear) params.year = disparityYear;
+      else if (year) params.year = Number(year);
+      const res = await api.get("/boroughs/enforcement-disparity", { params });
+      setDisparityData(res.data);
+      setErrors((e) => ({ ...e, disparity: null }));
+    } catch (err) {
+      setErrors((e) => ({ ...e, disparity: err.message }));
+    } finally {
+      setLoading((l) => ({ ...l, disparity: false }));
+    }
+  }, [disparityYear, year]);
+
+  useEffect(() => {
+    fetchAda();
+    fetchCharge();
+    fetchDemographic();
+    fetchDisparity();
+  }, []);
+
+  // Pivot charge data by year: [{year, F, M, V}]
+  const chargePivoted = React.useMemo(() => {
     const map = {};
-    const filtered = selectedBoroughsApplied.length
-      ? ridershipData.filter((r) => selectedBoroughsApplied.includes(r.borough))
-      : ridershipData;
-    for (const row of filtered) {
+    for (const row of chargeData) {
+      const type = String(row.law_cat_cd || "").trim().toUpperCase();
+      if (!VALID_CHARGE_TYPES.includes(type)) continue;
       if (!map[row.year]) map[row.year] = { year: row.year };
-      map[row.year][row.borough] = Number(row.total_ridership);
+      map[row.year][type] = Number(row.arrest_count);
     }
     return Object.values(map).sort((a, b) => a.year - b.year);
-  }, [ridershipData, selectedBoroughsApplied]);
+  }, [chargeData]);
 
-  const activeBoroughs = selectedBoroughsApplied.length ? selectedBoroughsApplied : BOROUGHS;
+  const chargeTypes = VALID_CHARGE_TYPES.filter((type) =>
+    chargePivoted.some((row) => Number.isFinite(Number(row[type])))
+  );
 
-  // Borough summary for metric cards
-  const boroughSummary = React.useMemo(() => {
-    const map = {};
-    for (const row of ridershipData) {
-      if (!map[row.borough]) map[row.borough] = 0;
-      map[row.borough] += Number(row.total_ridership);
-    }
-    return map;
-  }, [ridershipData]);
+  // Latest year disparity for bar chart
+  const latestDisparityYear = disparityData.length
+    ? Math.max(...disparityData.map((r) => r.year))
+    : null;
+  const latestDisparity = disparityData.filter((r) => r.year === latestDisparityYear);
 
-  // Latest year intensity
-  const latestIntensity = React.useMemo(() => {
-    const years = [...new Set(intensityData.map((r) => r.year))].sort((a, b) => b - a);
-    const latestYear = years[0];
-    return intensityData.filter((r) => r.year === latestYear);
-  }, [intensityData]);
-
-  const intensityChartData = React.useMemo(() => {
-    const map = {};
-    for (const row of intensityData) {
-      if (!map[row.borough]) map[row.borough] = { borough: row.borough, total: 0, count: 0 };
-      map[row.borough].total += Number(row.est_evaded_per_100k_riders);
-      map[row.borough].count += 1;
-    }
-    return Object.values(map).map((v) => ({
-      borough: v.borough,
-      avg_intensity: +(v.total / v.count).toFixed(2),
-    }));
-  }, [intensityData]);
-
-  function toggleBorough(borough) {
-    setSelectedBoroughsDraft((prev) =>
-      prev.includes(borough) ? prev.filter((b) => b !== borough) : [...prev, borough]
-    );
-  }
+  // Summary: total arrests from charge data
+  const totalArrests = chargeData.reduce((s, r) => s + Number(r.arrest_count || 0), 0);
+  const totalAdaStations = adaData.reduce((s, r) => s + Number(r.accessible_stations || 0), 0);
 
   return (
     <div className="page-container">
       <div className="page-header">
         <h1>Borough-Level Equity Comparison</h1>
-        <p>Ridership patterns, accessibility, and estimated evasion intensity across NYC boroughs</p>
+        <p>Enforcement disparities, demographic patterns, and accessibility across NYC boroughs</p>
       </div>
 
       <div className="filters-bar">
         <div className="filter-group">
-          <label>Year Start</label>
+          <label>Year</label>
           <input
-            type="number" placeholder="e.g. 2020"
-            value={yearStart} onChange={(e) => setYearStart(e.target.value)} min="2015" max="2030"
+            type="number"
+            placeholder="e.g. 2024"
+            value={year}
+            onChange={(e) => setYear(e.target.value)}
+            min="2020"
+            max="2024"
+            style={{ width: 120 }}
           />
-        </div>
-        <div className="filter-group">
-          <label>Year End</label>
-          <input
-            type="number" placeholder="e.g. 2024"
-            value={yearEnd} onChange={(e) => setYearEnd(e.target.value)} min="2015" max="2030"
-          />
-        </div>
-        <div className="filter-group">
-          <label>Boroughs (multi-select)</label>
-          <div className="multi-select-shell">
-            <div className="multi-select-header">
-              {selectedBoroughsDraft.length ? `${selectedBoroughsDraft.length} selected` : "All boroughs"}
-            </div>
-            <div className="multi-select-chips">
-              {BOROUGHS.map((b) => (
-                <button
-                  key={b}
-                  type="button"
-                  className={`multi-select-chip ${selectedBoroughsDraft.includes(b) ? "is-selected" : ""}`}
-                  onClick={() => toggleBorough(b)}
-                >
-                  {b}
-                </button>
-              ))}
-            </div>
-            <div className="multi-select-actions">
-              <button
-                type="button"
-                className="multi-select-link"
-                onClick={() => setSelectedBoroughsDraft(BOROUGHS)}
-              >
-                Select All
-              </button>
-              <button
-                type="button"
-                className="multi-select-link"
-                onClick={() => setSelectedBoroughsDraft([])}
-              >
-                Clear
-              </button>
-            </div>
-          </div>
         </div>
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setSelectedBoroughsApplied(selectedBoroughsDraft);
-              fetchAll();
-            }}
-          >
-            Apply
-          </button>
+          <button className="btn btn-primary" onClick={() => { fetchCharge(); fetchDemographic(); fetchDisparity(); }}>Apply</button>
         </div>
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
-          <button
-            className="btn btn-ghost"
-            onClick={() => {
-              setYearStart("");
-              setYearEnd("");
-              setSelectedBoroughsDraft([]);
-              setSelectedBoroughsApplied([]);
-            }}
-          >
-            Clear
-          </button>
+          <button className="btn btn-ghost" onClick={() => setYear("2024")}>Clear</button>
         </div>
       </div>
 
-      {/* Borough metric cards */}
-      {!loading.ridership && (
-        <div className="grid-5 ui-fade-in" style={{ marginBottom: 24 }}>
-          {BOROUGHS.map((b) => (
-            <MetricCard
-              key={b}
-              label={b}
-              value={boroughSummary[b] ? (boroughSummary[b] / 1_000_000).toFixed(1) + "M" : "N/A"}
-              subValue="total rides"
-              color={BOROUGH_COLORS[b]}
-            />
-          ))}
+      {/* Summary metric cards */}
+      {!loading.charge && !loading.ada && (
+        <div className="grid-3 ui-fade-in" style={{ marginBottom: 24 }}>
+          <MetricCard label={`Total Arrests${year ? ` (${year})` : ""}`} value={fmt(totalArrests)} color="#ef4444" />
+          <MetricCard label="ADA-Accessible Stations" value={fmt(totalAdaStations)} color="#3b82f6" />
+          <MetricCard
+            label="Boroughs with Data"
+            value={[...new Set(disparityData.map((r) => r.borough))].length || "N/A"}
+            color="#10b981"
+          />
         </div>
       )}
 
-      {/* Ridership by Year */}
+      {/* Arrests by Charge Severity and Year (Query 3) */}
       <div className="chart-container">
-        <div className="chart-title">Ridership by Borough and Year</div>
-        <div className="chart-subtitle">Total paid rides per borough per year</div>
-        {loading.ridership && <LoadingSpinner />}
-        {errors.ridership && <ErrorMessage message={errors.ridership} onRetry={fetchAll} />}
-        {!loading.ridership && !errors.ridership && (
+        <div className="chart-title">Arrests by Charge Severity and Year</div>
+        <div className="chart-subtitle">
+          F = Felony &bull; M = Misdemeanor &bull; V = Violation, tracks whether enforcement has shifted toward more serious charges</div>
+        {loading.charge && <LoadingSpinner />}
+        {errors.charge && <ErrorMessage message={errors.charge} onRetry={fetchCharge} />}
+        {!loading.charge && !errors.charge && chargePivoted.length > 0 && (
           <div className="ui-fade-in">
-            <ResponsiveContainer width="100%" height={340}>
-              <BarChart data={ridershipPivoted} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chargePivoted} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="year" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
                 <YAxis
                   stroke="var(--text-secondary)"
                   tick={{ fill: "var(--text-secondary)", fontSize: 12 }}
-                  tickFormatter={(v) => (v / 1_000_000).toFixed(0) + "M"}
+                  tickFormatter={(v) => v.toLocaleString()}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ color: "var(--text-secondary)", fontSize: 12 }} />
-                {activeBoroughs.map((b) => (
-                  <Bar key={b} dataKey={b} fill={BOROUGH_COLORS[b]} name={b} radius={[2, 2, 0, 0]} />
+                {chargeTypes.map((type) => (
+                  <Bar
+                    key={type}
+                    dataKey={type}
+                    name={type === "F" ? "Felony (F)" : type === "M" ? "Misdemeanor (M)" : type === "V" ? "Violation (V)" : type}
+                    fill={CHARGE_COLORS[type] || "#64748b"}
+                    radius={[2, 2, 0, 0]}
+                  />
                 ))}
               </BarChart>
             </ResponsiveContainer>
@@ -271,19 +225,24 @@ export default function BoroughEquity() {
       </div>
 
       <div className="grid-2">
-        {/* ADA Stations */}
+        {/* ADA Stations (Query 5) */}
         <div className="chart-container">
           <div className="chart-title">ADA-Accessible Stations by Borough</div>
-          <div className="chart-subtitle">Stations meeting ADA accessibility requirements</div>
+          <div className="chart-subtitle">Stations with full ADA accessibility (ADA = 1)</div>
           {loading.ada && <LoadingSpinner />}
-          {errors.ada && <ErrorMessage message={errors.ada} onRetry={fetchAll} />}
+          {errors.ada && <ErrorMessage message={errors.ada} onRetry={fetchAda} />}
           {!loading.ada && !errors.ada && (
             <div className="ui-fade-in">
               <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={adaData} layout="vertical" margin={{ top: 5, right: 20, left: 80, bottom: 5 }}>
+                <BarChart data={adaData} layout="vertical" margin={{ top: 5, right: 20, left: 100, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                   <XAxis type="number" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
-                  <YAxis type="category" dataKey="borough" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} width={80} />
+                  <YAxis
+                    type="category" dataKey="borough"
+                    stroke="var(--text-secondary)"
+                    tick={{ fill: "var(--text-secondary)", fontSize: 12 }}
+                    width={100}
+                  />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar dataKey="accessible_stations" name="Accessible Stations" radius={[0, 4, 4, 0]}>
                     {adaData.map((entry) => (
@@ -296,23 +255,53 @@ export default function BoroughEquity() {
           )}
         </div>
 
-        {/* Evasion Intensity */}
+        {/* Enforcement Disparity ratio chart (Query 8) */}
         <div className="chart-container">
-          <div className="chart-title">Estimated Evasion Intensity by Borough</div>
-          <div className="chart-subtitle">Avg. estimated evaded rides per 100k riders (all years)</div>
-          {loading.intensity && <LoadingSpinner />}
-          {errors.intensity && <ErrorMessage message={errors.intensity} onRetry={fetchAll} />}
-          {!loading.intensity && !errors.intensity && (
+          <div className="chart-title">Arrest-to-Evasion Ratio by Borough</div>
+          <div className="chart-subtitle">
+            Selected year — arrests as % of estimated evaders; higher = heavier policing relative to evasion
+          </div>
+          {loading.disparity && <LoadingSpinner />}
+          {errors.disparity && <ErrorMessage message={errors.disparity} onRetry={fetchDisparity} />}
+          {!loading.disparity && !errors.disparity && latestDisparity.length > 0 && (
             <div className="ui-fade-in">
               <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={intensityChartData} layout="vertical" margin={{ top: 5, right: 20, left: 80, bottom: 5 }}>
+                <BarChart
+                  data={latestDisparity}
+                  layout="vertical"
+                  margin={{ top: 5, right: 20, left: 100, bottom: 5 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                   <XAxis type="number" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} />
-                  <YAxis type="category" dataKey="borough" stroke="var(--text-secondary)" tick={{ fill: "var(--text-secondary)", fontSize: 12 }} width={80} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="avg_intensity" name="Avg Evaded / 100k Riders" radius={[0, 4, 4, 0]}>
-                    {intensityChartData.map((entry) => (
-                      <Cell key={entry.borough} fill={BOROUGH_COLORS[entry.borough] || "#f59e0b"} />
+                  <YAxis
+                    type="category" dataKey="borough"
+                    stroke="var(--text-secondary)"
+                    tick={{ fill: "var(--text-secondary)", fontSize: 12 }}
+                    width={100}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      const row = payload[0]?.payload;
+                      return (
+                        <div className="custom-tooltip">
+                          <div className="label">{label} ({row?.year})</div>
+                          <div style={{ color: "#ef4444", marginTop: 2 }}>
+                            Arrest/Evasion Ratio: <strong>{fmtRatio(row?.arrest_to_evasion_ratio)}</strong>
+                          </div>
+                          <div style={{ color: "#f59e0b", marginTop: 2 }}>
+                            Total Arrests: <strong>{fmt(row?.total_arrests)}</strong>
+                          </div>
+                          <div style={{ color: "#3b82f6", marginTop: 2 }}>
+                            Est. Evaded Rides: <strong>{fmt(row?.est_evaded_rides)}</strong>
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Bar dataKey="arrest_to_evasion_ratio" name="Arrest/Evasion Ratio (%)" radius={[0, 4, 4, 0]}>
+                    {latestDisparity.map((entry) => (
+                      <Cell key={entry.borough} fill={BOROUGH_COLORS[entry.borough] || "#ef4444"} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -322,40 +311,62 @@ export default function BoroughEquity() {
         </div>
       </div>
 
-      {/* Latest Year Intensity Table */}
-      {!loading.intensity && !errors.intensity && latestIntensity.length > 0 && (
-        <div className="chart-container ui-fade-in">
-          <div className="chart-title">Evasion Intensity Detail, Latest Year ({latestIntensity[0]?.year})</div>
-          <div className="table-container" style={{ marginTop: 12 }}>
+      {/* Enforcement Disparity full table (Query 8) */}
+      <div className="chart-container">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
+          <div>
+            <div className="chart-title" style={{ marginBottom: 4 }}>Borough Enforcement Disparity Detail</div>
+            <div className="chart-subtitle">Arrests vs. estimated evasion volume per borough per year</div>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+            <div className="filter-group" style={{ marginBottom: 0 }}>
+              <label style={{ fontSize: "0.75rem" }}>Filter Year</label>
+              <input
+                type="number" placeholder="Use page year"
+                value={disparityYear} onChange={(e) => setDisparityYear(e.target.value)}
+                min="2020" max="2024" style={{ width: 110 }}
+              />
+            </div>
+            <button className="btn btn-primary" style={{ marginBottom: 0 }} onClick={fetchDisparity}>Apply</button>
+            <button className="btn btn-ghost" style={{ marginBottom: 0 }} onClick={() => setDisparityYear("")}>Clear</button>
+          </div>
+        </div>
+
+        {loading.disparity && <LoadingSpinner />}
+        {errors.disparity && <ErrorMessage message={errors.disparity} onRetry={fetchDisparity} />}
+        {!loading.disparity && !errors.disparity && disparityData.length > 0 && (
+          <div className="table-container ui-fade-in">
             <table>
               <thead>
                 <tr>
                   <th>Borough</th>
-                  <th>Paid Rides</th>
+                  <th>Year</th>
                   <th>Est. Evaded Rides</th>
-                  <th>Est. Evaded per 100k Riders</th>
+                  <th>Total Arrests</th>
+                  <th>Arrest / Evasion Ratio</th>
                 </tr>
               </thead>
               <tbody>
-                {latestIntensity.map((row) => (
-                  <tr key={row.borough}>
+                {disparityData.map((row, i) => (
+                  <tr key={`${row.borough}-${row.year}-${i}`}>
                     <td>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                         <span style={{
                           width: 10, height: 10, borderRadius: 2,
-                          background: BOROUGH_COLORS[row.borough] || "#64748b", display: "inline-block"
+                          background: BOROUGH_COLORS[row.borough] || "#64748b", display: "inline-block",
                         }} />
                         {row.borough}
                       </span>
                     </td>
-                    <td>{fmt(row.paid_rides)}</td>
+                    <td>{row.year}</td>
                     <td>{fmt(row.est_evaded_rides)}</td>
+                    <td>{fmt(row.total_arrests)}</td>
                     <td>
                       <span className={
-                        row.est_evaded_per_100k_riders > 10000 ? "badge badge-red" :
-                        row.est_evaded_per_100k_riders > 5000 ? "badge badge-yellow" : "badge badge-green"
+                        Number(row.arrest_to_evasion_ratio) > 0.1 ? "badge badge-red" :
+                        Number(row.arrest_to_evasion_ratio) > 0.05 ? "badge badge-yellow" : "badge badge-green"
                       }>
-                        {fmt(row.est_evaded_per_100k_riders)}
+                        {fmtRatio(row.arrest_to_evasion_ratio)}
                       </span>
                     </td>
                   </tr>
@@ -363,8 +374,65 @@ export default function BoroughEquity() {
               </tbody>
             </table>
           </div>
+        )}
+      </div>
+
+      {/* Demographic Breakdown of Arrests (Query 4) */}
+      <div className="chart-container">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
+          <div>
+            <div className="chart-title" style={{ marginBottom: 4 }}>Demographic Breakdown of Arrests by Borough</div>
+            <div className="chart-subtitle">Age group and race breakdown of fare evasion enforcement</div>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+            <div className="filter-group" style={{ marginBottom: 0 }}>
+              <label style={{ fontSize: "0.75rem" }}>Filter Borough</label>
+              <select value={selectedBorough} onChange={(e) => setSelectedBorough(e.target.value)} style={{ minWidth: 140 }}>
+                <option value="">All Boroughs</option>
+                {BOROUGHS.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            <button className="btn btn-primary" style={{ marginBottom: 0 }} onClick={fetchDemographic}>Apply</button>
+            <button className="btn btn-ghost" style={{ marginBottom: 0 }} onClick={() => setSelectedBorough("")}>Clear</button>
+          </div>
         </div>
-      )}
+
+        {loading.demographic && <LoadingSpinner />}
+        {errors.demographic && <ErrorMessage message={errors.demographic} onRetry={fetchDemographic} />}
+        {!loading.demographic && !errors.demographic && demographicData.length > 0 && (
+          <div className="table-container ui-fade-in">
+            <table>
+              <thead>
+                <tr>
+                  <th>Borough</th>
+                  <th>Age Group</th>
+                  <th>Race</th>
+                  <th>Arrest Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {demographicData.map((row, i) => (
+                  <tr key={`${row.borough}-${row.age_group}-${row.perp_race}-${i}`}>
+                    <td>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                        <span style={{
+                          width: 10, height: 10, borderRadius: 2,
+                          background: BOROUGH_COLORS[row.borough] || "#64748b", display: "inline-block",
+                        }} />
+                        {row.borough}
+                      </span>
+                    </td>
+                    <td>{row.age_group}</td>
+                    <td>{row.perp_race}</td>
+                    <td>{fmt(row.arrest_count)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
