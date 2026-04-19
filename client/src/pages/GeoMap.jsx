@@ -36,13 +36,14 @@ export default function GeoMap() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [borough, setBorough] = useState("");
-  const [topK, setTopK] = useState(5);
+  const [topK, setTopK] = useState("5");
 
   const fetchStations = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const params = { top_k: topK };
+      const params = {};
+      if (topK !== "all") params.top_k = Number(topK);
       if (borough) params.borough = borough;
       const res = await api.get("/map/top-non-cbd-stations", { params });
       setStations(res.data);
@@ -53,7 +54,7 @@ export default function GeoMap() {
     }
   }, [borough, topK]);
 
-  useEffect(() => { fetchStations(); }, [fetchStations]);
+  useEffect(() => { fetchStations(); }, []);
 
   const maxRidership = stations.length
     ? Math.max(...stations.map((s) => Number(s.total_ridership)))
@@ -71,7 +72,7 @@ export default function GeoMap() {
     <div className="page-container">
       <div className="page-header">
         <h1>Geospatial Station Map</h1>
-        <p>Top ridership non-CBD stations by borough — circle size reflects total ridership</p>
+        <p>Top ridership stations by borough , circle size reflects total ridership</p>
       </div>
 
       <div className="filters-bar">
@@ -83,8 +84,10 @@ export default function GeoMap() {
         </div>
         <div className="filter-group">
           <label>Top Stations per Borough</label>
-          <select value={topK} onChange={(e) => setTopK(Number(e.target.value))}>
-            {[3, 5, 10, 15, 20].map((n) => <option key={n} value={n}>{n}</option>)}
+          <select value={topK} onChange={(e) => setTopK(e.target.value)}>
+            {["3", "5", "10", "15", "20", "25", "30", "40", "50", "75", "100", "all"].map((n) => (
+              <option key={n} value={n}>{n === "all" ? "All" : n}</option>
+            ))}
           </select>
         </div>
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
@@ -136,12 +139,12 @@ export default function GeoMap() {
                     weight: 1.5,
                   }}
                 >
-                  <Popup>
+                  <Popup className="station-popup">
                     <div style={{
                       background: "var(--navy-light)",
                       color: "var(--text-primary)",
                       borderRadius: 8,
-                      padding: 8,
+                      padding: "10px 26px 10px 10px",
                       minWidth: 200,
                       fontSize: "0.875rem",
                     }}>
@@ -151,10 +154,6 @@ export default function GeoMap() {
                       <div style={{ marginBottom: 4 }}>
                         <span style={{ color: "#94a3b8" }}>Borough: </span>
                         {station.borough}
-                      </div>
-                      <div style={{ marginBottom: 4 }}>
-                        <span style={{ color: "#94a3b8" }}>Lines: </span>
-                        {station.lines || "N/A"}
                       </div>
                       <div style={{ marginBottom: 4 }}>
                         <span style={{ color: "#94a3b8" }}>Ridership: </span>
@@ -174,7 +173,7 @@ export default function GeoMap() {
           {/* Station list sidebar */}
           <div className="chart-container" style={{ marginBottom: 0, maxHeight: 620, overflowY: "auto" }}>
             <div className="chart-title">Station List</div>
-            <div className="chart-subtitle" style={{ marginBottom: 12 }}>Non-CBD top stations</div>
+            <div className="chart-subtitle" style={{ marginBottom: 12 }}>Top stations by borough</div>
 
             {/* Borough legend */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
@@ -212,11 +211,6 @@ export default function GeoMap() {
                   <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)", marginTop: 2 }}>
                     {station.borough} &bull; Rank #{station.borough_rank}
                   </div>
-                  {station.lines && (
-                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: 1 }}>
-                      Lines: {station.lines}
-                    </div>
-                  )}
                   <div style={{ fontSize: "0.7rem", color: "var(--accent)", marginTop: 2, fontWeight: 500 }}>
                     {(Number(station.total_ridership) / 1_000_000).toFixed(2)}M rides
                   </div>
@@ -235,3 +229,4 @@ export default function GeoMap() {
     </div>
   );
 }
+

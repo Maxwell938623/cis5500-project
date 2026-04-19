@@ -106,7 +106,7 @@ export default function FinancialImpact() {
     fetchQuarterly();
     fetchRevenue();
     fetchPayment();
-  }, [fetchQuarterly, fetchRevenue, fetchPayment]);
+  }, []);
 
   // Add error bar data to quarterly
   const quarterlyWithLabel = quarterlyData.map((r) => ({
@@ -176,7 +176,6 @@ export default function FinancialImpact() {
           <MetricCard
             label="Total Est. Revenue Lost"
             value={fmt(totalRevenueLost)}
-            subValue={`at $${fareAmount}/fare`}
             color="#ef4444"
           />
           <MetricCard

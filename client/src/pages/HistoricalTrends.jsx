@@ -47,7 +47,7 @@ export default function HistoricalTrends() {
     }
   }, [yearStart, yearEnd]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchData(); }, []);
 
   const latestYear = data.length ? data[data.length - 1] : null;
   const totalRidership = latestYear?.total_ridership;

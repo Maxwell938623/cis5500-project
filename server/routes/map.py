@@ -8,7 +8,7 @@ router = APIRouter()
 @router.get("/top-non-cbd-stations")
 def get_top_non_cbd_stations(
     borough: Optional[str] = Query(None),
-    top_k: int = Query(5, ge=1, le=50),
+    top_k: Optional[int] = Query(None, ge=1, le=100),
 ):
     try:
         with get_db_connection() as conn:
@@ -20,7 +20,7 @@ def get_top_non_cbd_stations(
                 sv_params.append(borough)
 
             sv_where = ("WHERE " + " AND ".join(sv_conditions)) if sv_conditions else ""
-            params = sv_params + [top_k]
+            params = sv_params + [top_k, top_k]
 
             sql = f"""
                 WITH station_volume AS (
@@ -32,19 +32,26 @@ def get_top_non_cbd_stations(
                     {sv_where}
                     GROUP BY r.station_complex_id, r.station_complex, r.borough
                 ),
+                stationcoords_dedup AS (
+                    SELECT
+                        complex_id::text AS complex_id,
+                        MAX(daytime_routes) AS lines,
+                        BOOL_OR(cbd) AS is_cbd
+                    FROM stationcoords
+                    GROUP BY complex_id::text
+                ),
                 with_coords AS (
                     SELECT sv.station_complex, sv.borough, sv.total_ridership,
                         sv.latitude, sv.longitude,
-                        sc.daytime_routes AS lines, sc.cbd AS is_cbd,
+                        scd.lines, scd.is_cbd,
                         RANK() OVER (PARTITION BY sv.borough ORDER BY sv.total_ridership DESC) AS borough_rank
                     FROM station_volume sv
-                    JOIN stationcoords sc ON sv.station_complex_id::text = sc.complex_id::text
-                    WHERE sc.cbd = FALSE
+                    JOIN stationcoords_dedup scd ON sv.station_complex_id::text = scd.complex_id
                 )
                 SELECT station_complex, borough, lines, total_ridership,
                     latitude, longitude, borough_rank
                 FROM with_coords
-                WHERE borough_rank <= %s
+                WHERE (%s IS NULL OR borough_rank <= %s)
                 ORDER BY borough, borough_rank
             """
             cur.execute(sql, params)

@@ -1,4 +1,4 @@
-# NYC Subway Analytics — CIS 5500 Project
+# NYC Subway Analytics , CIS 5500 Project
 
 A full-stack web application for analyzing NYC subway ridership patterns and estimated fare evasion data.
 
@@ -87,9 +87,9 @@ The app will open at `http://localhost:3000`. It proxies API requests to `http:/
 
 ## Database Schema
 
-- **fareevasionstats** — `(year, quarter, fare_evasion, margin_of_error)` — MTA quarterly survey data
-- **stationcoords** — Station metadata with geographic coordinates and ADA/CBD flags
-- **ridership** — Tap-in ridership records with payment method and fare class
+- **fareevasionstats** , `(year, quarter, fare_evasion, margin_of_error)` , MTA quarterly survey data
+- **stationcoords** , Station metadata with geographic coordinates and ADA/CBD flags
+- **ridership** , Tap-in ridership records with payment method and fare class
 
 ## Tech Stack
 

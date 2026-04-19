@@ -43,7 +43,8 @@ export default function BoroughEquity() {
   const [errors, setErrors] = useState({});
   const [yearStart, setYearStart] = useState("");
   const [yearEnd, setYearEnd] = useState("");
-  const [selectedBoroughs, setSelectedBoroughs] = useState([]);
+  const [selectedBoroughsDraft, setSelectedBoroughsDraft] = useState([]);
+  const [selectedBoroughsApplied, setSelectedBoroughsApplied] = useState([]);
 
   const fetchAll = useCallback(async () => {
     const params = {};
@@ -87,22 +88,22 @@ export default function BoroughEquity() {
     }
   }, [yearStart, yearEnd]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => { fetchAll(); }, []);
 
   // Pivot ridership data for grouped bar chart: [{year, Manhattan, Brooklyn, ...}]
   const ridershipPivoted = React.useMemo(() => {
     const map = {};
-    const filtered = selectedBoroughs.length
-      ? ridershipData.filter((r) => selectedBoroughs.includes(r.borough))
+    const filtered = selectedBoroughsApplied.length
+      ? ridershipData.filter((r) => selectedBoroughsApplied.includes(r.borough))
       : ridershipData;
     for (const row of filtered) {
       if (!map[row.year]) map[row.year] = { year: row.year };
       map[row.year][row.borough] = Number(row.total_ridership);
     }
     return Object.values(map).sort((a, b) => a.year - b.year);
-  }, [ridershipData, selectedBoroughs]);
+  }, [ridershipData, selectedBoroughsApplied]);
 
-  const activeBoroughs = selectedBoroughs.length ? selectedBoroughs : BOROUGHS;
+  const activeBoroughs = selectedBoroughsApplied.length ? selectedBoroughsApplied : BOROUGHS;
 
   // Borough summary for metric cards
   const boroughSummary = React.useMemo(() => {
@@ -135,7 +136,7 @@ export default function BoroughEquity() {
   }, [intensityData]);
 
   function toggleBorough(borough) {
-    setSelectedBoroughs((prev) =>
+    setSelectedBoroughsDraft((prev) =>
       prev.includes(borough) ? prev.filter((b) => b !== borough) : [...prev, borough]
     );
   }
@@ -166,14 +167,14 @@ export default function BoroughEquity() {
           <label>Boroughs (multi-select)</label>
           <div className="multi-select-shell">
             <div className="multi-select-header">
-              {selectedBoroughs.length ? `${selectedBoroughs.length} selected` : "All boroughs"}
+              {selectedBoroughsDraft.length ? `${selectedBoroughsDraft.length} selected` : "All boroughs"}
             </div>
             <div className="multi-select-chips">
               {BOROUGHS.map((b) => (
                 <button
                   key={b}
                   type="button"
-                  className={`multi-select-chip ${selectedBoroughs.includes(b) ? "is-selected" : ""}`}
+                  className={`multi-select-chip ${selectedBoroughsDraft.includes(b) ? "is-selected" : ""}`}
                   onClick={() => toggleBorough(b)}
                 >
                   {b}
@@ -184,14 +185,14 @@ export default function BoroughEquity() {
               <button
                 type="button"
                 className="multi-select-link"
-                onClick={() => setSelectedBoroughs(BOROUGHS)}
+                onClick={() => setSelectedBoroughsDraft(BOROUGHS)}
               >
                 Select All
               </button>
               <button
                 type="button"
                 className="multi-select-link"
-                onClick={() => setSelectedBoroughs([])}
+                onClick={() => setSelectedBoroughsDraft([])}
               >
                 Clear
               </button>
@@ -200,11 +201,27 @@ export default function BoroughEquity() {
         </div>
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
-          <button className="btn btn-primary" onClick={fetchAll}>Apply</button>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setSelectedBoroughsApplied(selectedBoroughsDraft);
+              fetchAll();
+            }}
+          >
+            Apply
+          </button>
         </div>
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
-          <button className="btn btn-ghost" onClick={() => { setYearStart(""); setYearEnd(""); setSelectedBoroughs([]); }}>
+          <button
+            className="btn btn-ghost"
+            onClick={() => {
+              setYearStart("");
+              setYearEnd("");
+              setSelectedBoroughsDraft([]);
+              setSelectedBoroughsApplied([]);
+            }}
+          >
             Clear
           </button>
         </div>
@@ -308,7 +325,7 @@ export default function BoroughEquity() {
       {/* Latest Year Intensity Table */}
       {!loading.intensity && !errors.intensity && latestIntensity.length > 0 && (
         <div className="chart-container ui-fade-in">
-          <div className="chart-title">Evasion Intensity Detail — Latest Year ({latestIntensity[0]?.year})</div>
+          <div className="chart-title">Evasion Intensity Detail , Latest Year ({latestIntensity[0]?.year})</div>
           <div className="table-container" style={{ marginTop: 12 }}>
             <table>
               <thead>

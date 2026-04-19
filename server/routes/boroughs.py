@@ -57,7 +57,7 @@ def get_ada_stations(borough: Optional[str] = Query(None)):
                 "staten island": "SI",
             }
 
-            conditions = ["ada = 1"]
+            conditions = ["ada IS TRUE"]
             params = []
             if borough:
                 mapped = borough_map.get(borough.lower(), borough)
@@ -75,7 +75,7 @@ def get_ada_stations(borough: Optional[str] = Query(None)):
                         WHEN 'SI' THEN 'Staten Island'
                         ELSE borough
                     END AS borough,
-                    COUNT(*) AS accessible_stations
+                    COUNT(DISTINCT complex_id) AS accessible_stations
                 FROM stationcoords
                 WHERE {where_clause}
                 GROUP BY borough

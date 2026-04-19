@@ -583,3 +583,46 @@ tbody td {
 .custom-tooltip .value {
   color: var(--white);
 }
+
+/* Recharts hover cursor highlight */
+.recharts-tooltip-cursor {
+  fill: transparent !important;
+  stroke: none !important;
+}
+
+/* Leaflet popup styling for station map */
+.station-popup .leaflet-popup-content-wrapper {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.station-popup .leaflet-popup-content {
+  margin: 0;
+}
+
+.station-popup .leaflet-popup-tip {
+  background: var(--navy-light);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.station-popup .leaflet-popup-close-button {
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+  text-align: center;
+  border-radius: 999px;
+  color: var(--white) !important;
+  background: rgba(13, 27, 42, 0.55);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.station-popup .leaflet-popup-close-button:hover {
+  color: var(--white) !important;
+  background: rgba(13, 27, 42, 0.8);
+}
