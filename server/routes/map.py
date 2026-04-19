@@ -82,12 +82,7 @@ def get_top_non_cbd_stations(
                             NULLIF(to_jsonb(sc)->>'longitude', '')::double precision,
                             NULLIF(to_jsonb(sc)->>'gtfs_longitude', '')::double precision,
                             NULLIF(to_jsonb(sc)->>'GTFS Longitude', '')::double precision
-                        ) AS longitude,
-                        COALESCE(
-                            NULLIF(to_jsonb(sc)->>'cbd', '')::boolean,
-                            NULLIF(to_jsonb(sc)->>'CBD', '')::boolean,
-                            FALSE
-                        ) AS is_cbd
+                        ) AS longitude
                     FROM stationcoords sc
                 ),
                 stationcoords_agg AS (

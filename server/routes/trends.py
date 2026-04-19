@@ -42,7 +42,7 @@ def get_annual_trends(
                 monthly_arrests AS (
                     SELECT year::int AS year, month::int AS month, COUNT(*) AS total_arrests
                     FROM arrestsnypddataframe
-                    WHERE year = %s AND month IS NOT NULL
+                    WHERE year::int = %s AND month IS NOT NULL
                     GROUP BY year, month
                 ),
                 calendar AS (

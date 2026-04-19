@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const navItems = [
   { to: "/trends", label: "Historical Trends" },
@@ -11,6 +12,8 @@ const navItems = [
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <nav style={{
@@ -49,7 +52,7 @@ export default function Navbar() {
         </div>
 
         {/* Desktop links */}
-        <div style={{ display: "flex", gap: 4 }} className="nav-links-desktop">
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }} className="nav-links-desktop">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -69,6 +72,25 @@ export default function Navbar() {
               {item.label}
             </NavLink>
           ))}
+          {user && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 8, paddingLeft: 12, borderLeft: "1px solid var(--border)" }}>
+              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{user.name || user.email}</span>
+              <button
+                onClick={() => { logout(); navigate("/login", { replace: true }); }}
+                style={{
+                  padding: "5px 12px",
+                  borderRadius: 6,
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text-secondary)",
+                  fontSize: "0.8rem",
+                  cursor: "pointer",
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Hamburger for mobile */}

@@ -22,10 +22,8 @@ def get_quarterly_evasion(
             if target_year is None:
                 return []
 
-            conditions = ["fare_evasion IS NOT NULL"]
+            conditions = ["fare_evasion IS NOT NULL", "year::int = %s"]
             params = [target_year]
-            conditions.append("year = %s")
-
             where_clause = " AND ".join(conditions)
             sql = f"""
                 SELECT year, quarter,
@@ -67,10 +65,8 @@ def get_revenue_loss(
             if target_year is None:
                 return []
 
-            conditions = ["fe.fare_evasion IS NOT NULL"]
+            conditions = ["fe.fare_evasion IS NOT NULL", "r.year::int = %s"]
             params = [target_year]
-            conditions.append("r.year = %s")
-
             where_clause = " AND ".join(conditions)
             sql = f"""
                 WITH {RIDERSHIP_ALL_CTE}

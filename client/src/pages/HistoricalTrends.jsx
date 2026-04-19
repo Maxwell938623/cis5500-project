@@ -85,7 +85,7 @@ export default function HistoricalTrends() {
         </div>
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
-          <button className="btn btn-ghost" onClick={() => { setYear("2024"); }}>Clear</button>
+          <button className="btn btn-ghost" onClick={() => { setYear("2024"); fetchData(); }}>Clear</button>
         </div>
       </div>
 

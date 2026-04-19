@@ -40,7 +40,7 @@ def get_demographic_arrests(
             cur = conn.cursor()
             target_year = year
             if target_year is None:
-                cur.execute("SELECT MAX(year)::int AS max_year FROM arrestsnypddataframe WHERE year IS NOT NULL")
+                cur.execute("SELECT MAX(year::int) AS max_year FROM arrestsnypddataframe WHERE year IS NOT NULL")
                 row = cur.fetchone()
                 target_year = row["max_year"] if row else None
             if target_year is None:
@@ -52,13 +52,15 @@ def get_demographic_arrests(
                 conditions.append("sm.borough ILIKE %s")
                 params.append(borough)
             if target_year is not None:
-                conditions.append("a.year = %s")
+                conditions.append("a.year::int = %s")
                 params.append(target_year)
 
             where_clause = " AND ".join(conditions)
             sql = f"""
                 WITH {STATION_META_CTE}
-                SELECT sm.borough, a.AGE_GROUP, a.PERP_RACE,
+                SELECT sm.borough,
+                       a.AGE_GROUP  AS age_group,
+                       a.PERP_RACE  AS perp_race,
                        COUNT(*) AS arrest_count
                 FROM arrestsnypddataframe a
                 JOIN station_meta sm ON a.station_complex_id = sm.station_complex_id
@@ -101,9 +103,9 @@ def get_enforcement_disparity(year: Optional[int] = Query(None)):
             yr_cond_a = ""
             params = []
             if target_year is not None:
-                yr_cond_r = "AND r.year = %s"
-                yr_cond_fe = "AND year = %s"
-                yr_cond_a = "AND a.year = %s"
+                yr_cond_r = "AND r.year::int = %s"
+                yr_cond_fe = "AND year::int = %s"
+                yr_cond_a = "AND a.year::int = %s"
                 params = [target_year, target_year, target_year]
 
             sql = f"""

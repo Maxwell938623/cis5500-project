@@ -13,15 +13,15 @@ def get_arrests_by_charge_year(year: Optional[int] = Query(None)):
             cur = conn.cursor()
             target_year = year
             if target_year is None:
-                cur.execute("SELECT MAX(year)::int AS max_year FROM arrestsnypddataframe WHERE year IS NOT NULL")
+                cur.execute("SELECT MAX(year::int) AS max_year FROM arrestsnypddataframe WHERE year IS NOT NULL")
                 row = cur.fetchone()
                 target_year = row["max_year"] if row else None
             if target_year is None:
                 return []
 
-            where_clause = "WHERE year = %s AND LAW_CAT_CD IN ('F', 'M', 'V')"
+            where_clause = "WHERE year::int = %s AND LAW_CAT_CD IN ('F', 'M', 'V')"
             sql = f"""
-                SELECT year, LAW_CAT_CD, COUNT(*) AS arrest_count
+                SELECT year::int AS year, LAW_CAT_CD AS law_cat_cd, COUNT(*) AS arrest_count
                 FROM arrestsnypddataframe
                 {where_clause}
                 GROUP BY year, LAW_CAT_CD
