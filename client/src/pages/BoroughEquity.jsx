@@ -325,7 +325,7 @@ export default function BoroughEquity() {
       {/* Latest Year Intensity Table */}
       {!loading.intensity && !errors.intensity && latestIntensity.length > 0 && (
         <div className="chart-container ui-fade-in">
-          <div className="chart-title">Evasion Intensity Detail , Latest Year ({latestIntensity[0]?.year})</div>
+          <div className="chart-title">Evasion Intensity Detail, Latest Year ({latestIntensity[0]?.year})</div>
           <div className="table-container" style={{ marginTop: 12 }}>
             <table>
               <thead>

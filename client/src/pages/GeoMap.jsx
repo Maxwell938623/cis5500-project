@@ -72,7 +72,7 @@ export default function GeoMap() {
     <div className="page-container">
       <div className="page-header">
         <h1>Geospatial Station Map</h1>
-        <p>Top ridership stations by borough , circle size reflects total ridership</p>
+        <p>Top ridership stations by borough, circle size reflects total ridership</p>
       </div>
 
       <div className="filters-bar">

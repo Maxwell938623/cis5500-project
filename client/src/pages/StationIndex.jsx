@@ -111,7 +111,7 @@ export default function StationIndex() {
     <div className="page-container">
       <div className="page-header">
         <h1>Station Fare-Risk Index</h1>
-        <p>Reduced-fare ridership profile by station , a proxy for fare-risk concentration</p>
+        <p>Reduced-fare ridership profile by station, a proxy for fare-risk concentration</p>
       </div>
 
       {/* Filters */}
@@ -235,7 +235,7 @@ export default function StationIndex() {
         <div className="chart-container" style={{ marginBottom: 0 }}>
           <div className="chart-title">Fare-Risk Profile by Station</div>
           <div className="chart-subtitle">
-            Ranked by reduced-fare ridership percentage within borough , higher % may indicate concentrated need for targeted support
+            Ranked by reduced-fare ridership percentage within borough, higher % may indicate concentrated need for targeted support
           </div>
           {loading.risk && <LoadingSpinner />}
           {errors.risk && <ErrorMessage message={errors.risk} onRetry={fetchRisk} />}
