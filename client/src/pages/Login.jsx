@@ -1,11 +1,13 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../api";
 
 export default function Login() {
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = location.state?.from?.pathname || "/trends";
 
   const [tab, setTab] = useState("signin"); // "signin" | "register"
   const [email, setEmail] = useState("");
@@ -13,6 +15,26 @@ export default function Login() {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const oauthError = params.get("error");
+    if (!oauthError) return;
+
+    const errorMap = {
+      google_token_failed: "Google sign-in failed while exchanging tokens.",
+      google_userinfo_failed: "Google sign-in failed while loading your profile.",
+      google_email_missing: "Google did not provide an email address for this account.",
+      google_email_unverified: "Google account email is not verified.",
+      google_userinfo_invalid: "Google sign-in returned invalid account data.",
+      twitter_token_failed: "X / Twitter sign-in failed while exchanging tokens.",
+      twitter_userinfo_failed: "X / Twitter sign-in failed while loading your profile.",
+      twitter_userinfo_invalid: "X / Twitter sign-in returned invalid account data.",
+      token_invalid: "Your sign-in token is invalid or expired. Please try again.",
+    };
+
+    setError(errorMap[oauthError] || "OAuth sign-in failed. Please try again.");
+  }, [location.search]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -25,7 +47,7 @@ export default function Login() {
         if (password.length < 6) { setError("Password must be at least 6 characters"); setSubmitting(false); return; }
         await register(email, password, name);
       }
-      navigate("/trends", { replace: true });
+      navigate(redirectTo, { replace: true });
     } catch (err) {
       const msg = err?.response?.data?.detail || err.message || "Something went wrong";
       setError(msg);

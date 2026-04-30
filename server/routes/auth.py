@@ -5,12 +5,13 @@ import base64
 import time
 from datetime import datetime, timedelta
 from typing import Optional
+from urllib.parse import quote_plus
 
 import httpx
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -45,6 +46,18 @@ def _purge_expired_states():
     expired = [k for k, v in _oauth_states.items() if now - v.get("ts", 0) > _OAUTH_STATE_TTL]
     for k in expired:
         del _oauth_states[k]
+
+
+def _consume_oauth_state(state: str, provider: str) -> dict:
+    _purge_expired_states()
+    stored = _oauth_states.get(state)
+    if not stored or stored.get("provider") != provider:
+        raise HTTPException(status_code=400, detail="Invalid OAuth state")
+    if time.time() - stored.get("ts", 0) > _OAUTH_STATE_TTL:
+        del _oauth_states[state]
+        raise HTTPException(status_code=400, detail="OAuth state expired")
+    del _oauth_states[state]
+    return stored
 
 
 def _ensure_users_table():
@@ -89,13 +102,13 @@ def _get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depe
 # ── Pydantic models ──────────────────────────────────────────────────────────
 
 class RegisterRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str
     name: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
-    email: str
+    email: EmailStr
     password: str
 
 
@@ -106,13 +119,14 @@ def register(req: RegisterRequest):
     _ensure_users_table()
     if len(req.password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    normalized_email = req.email.lower().strip()
     password_hash = pwd_context.hash(req.password)
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
             cur.execute(
                 "INSERT INTO users (email, name, password_hash, provider) VALUES (%s, %s, %s, 'local') RETURNING id, email, name",
-                (req.email.lower().strip(), req.name or req.email.split("@")[0], password_hash),
+                (normalized_email, req.name or normalized_email.split("@")[0], password_hash),
             )
             user = cur.fetchone()
             conn.commit()
@@ -121,16 +135,17 @@ def register(req: RegisterRequest):
     except Exception as e:
         if "unique" in str(e).lower():
             raise HTTPException(status_code=409, detail="Email already registered")
-        raise HTTPException(status_code=500, detail=f"Registration failed: {e}")
+        raise HTTPException(status_code=500, detail="Registration failed")
 
 
 @router.post("/login")
 def login(req: LoginRequest):
     _ensure_users_table()
+    normalized_email = req.email.lower().strip()
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT id, email, name, password_hash FROM users WHERE email = %s AND provider = 'local'", (req.email.lower().strip(),))
+            cur.execute("SELECT id, email, name, password_hash FROM users WHERE email = %s AND provider = 'local'", (normalized_email,))
             user = cur.fetchone()
         if not user or not pwd_context.verify(req.password, user["password_hash"]):
             raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -138,8 +153,8 @@ def login(req: LoginRequest):
         return {"access_token": token, "token_type": "bearer", "user": {"email": user["email"], "name": user["name"]}}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Login failed: {e}")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Login failed")
 
 
 @router.get("/me")
@@ -169,9 +184,7 @@ def google_authorize():
 
 @router.get("/google/callback")
 async def google_callback(code: str = Query(...), state: str = Query(...)):
-    if state not in _oauth_states or _oauth_states[state].get("provider") != "google":
-        raise HTTPException(status_code=400, detail="Invalid OAuth state")
-    del _oauth_states[state]
+    _consume_oauth_state(state, "google")
 
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(
@@ -197,8 +210,14 @@ async def google_callback(code: str = Query(...), state: str = Query(...)):
         google_user = user_resp.json()
 
     email = google_user.get("email", "").lower()
+    if not email:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=google_email_missing")
+    if not google_user.get("verified_email", False):
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=google_email_unverified")
     name = google_user.get("name") or email.split("@")[0]
     provider_id = str(google_user.get("id", ""))
+    if not provider_id:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=google_userinfo_invalid")
 
     _ensure_users_table()
     with get_db_connection() as conn:
@@ -214,7 +233,7 @@ async def google_callback(code: str = Query(...), state: str = Query(...)):
         conn.commit()
 
     token = _create_token(user["id"], user["email"], user["name"])
-    return RedirectResponse(f"{FRONTEND_URL}/?token={token}")
+    return RedirectResponse(f"{FRONTEND_URL}/oauth-callback#token={quote_plus(token)}")
 
 
 # ── Twitter / X OAuth 2.0 PKCE ───────────────────────────────────────────────
@@ -249,11 +268,8 @@ def twitter_authorize():
 
 @router.get("/twitter/callback")
 async def twitter_callback(code: str = Query(...), state: str = Query(...)):
-    stored = _oauth_states.get(state)
-    if not stored or stored.get("provider") != "twitter":
-        raise HTTPException(status_code=400, detail="Invalid OAuth state")
+    stored = _consume_oauth_state(state, "twitter")
     verifier = stored["verifier"]
-    del _oauth_states[state]
 
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(
@@ -280,6 +296,8 @@ async def twitter_callback(code: str = Query(...), state: str = Query(...)):
         tw_data = user_resp.json().get("data", {})
 
     provider_id = str(tw_data.get("id", ""))
+    if not provider_id:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=twitter_userinfo_invalid")
     name = tw_data.get("name") or tw_data.get("username", "twitter_user")
     email = f"twitter_{provider_id}@placeholder.invalid"
 
@@ -297,4 +315,4 @@ async def twitter_callback(code: str = Query(...), state: str = Query(...)):
         conn.commit()
 
     token = _create_token(user["id"], user["email"], user["name"])
-    return RedirectResponse(f"{FRONTEND_URL}/?token={token}")
+    return RedirectResponse(f"{FRONTEND_URL}/oauth-callback#token={quote_plus(token)}")

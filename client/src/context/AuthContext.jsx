@@ -46,10 +46,16 @@ export function AuthProvider({ children }) {
 
   const loginWithToken = useCallback(async (token) => {
     storeToken(token);
-    const res = await api.get("/auth/me");
-    setUser(res.data);
-    return res.data;
-  }, [storeToken]);
+    try {
+      const res = await api.get("/auth/me");
+      setUser(res.data);
+      return res.data;
+    } catch (err) {
+      clearToken();
+      setUser(null);
+      throw err;
+    }
+  }, [storeToken, clearToken]);
 
   const logout = useCallback(() => {
     clearToken();
