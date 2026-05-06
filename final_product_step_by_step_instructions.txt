@@ -1,5 +1,5 @@
 FINAL PRODUCT STEP-BY-STEP INSTRUCTIONS
-NYC Subway Fare Evasion Web Application
+MetroGuard Fare Evasion Web Application
 
 Purpose of this document
 This document consolidates the project guidelines, the milestone outline, the milestone SQL query document, the uploaded sample CSVs, and the current AWS/PostgreSQL DDL into one implementation guide for what the final product should contain. It is written so the team can build the final application in a way that is fully aligned with what has already been submitted.

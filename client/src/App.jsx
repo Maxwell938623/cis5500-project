@@ -55,7 +55,7 @@ function App() {
           borderTop: "1px solid var(--border)",
           background: "var(--navy-light)"
         }}>
-          NYC Subway Analytics, CIS 5500 Project, Data: MTA Open Data
+          MetroGuard, CIS 5500 Project, Data: MTA Open Data
         </footer>
       </div>
     </Router>

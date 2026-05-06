@@ -1,6 +1,6 @@
-# NYC Subway Analytics, CIS 5500 Project
+# MetroGuard, CIS 5500 Project
 
-A full-stack web application for analyzing NYC subway ridership patterns and estimated fare evasion data.
+A full-stack web application for analyzing NYC subway ridership patterns and estimated fare evasion data under the MetroGuard brand.
 
 ## Architecture
 

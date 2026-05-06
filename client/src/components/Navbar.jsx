@@ -33,7 +33,7 @@ export default function Navbar() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <img
             src="/5500_logo.png"
-            alt="NYC Subway Analytics logo"
+            alt="MetroGuard logo"
             style={{
             width: 32,
             height: 32,
@@ -44,7 +44,7 @@ export default function Navbar() {
           }}
           />
           <span style={{ fontWeight: 700, fontSize: "1rem", color: "var(--white)" }}>
-            NYC Subway Analytics
+            MetroGuard
           </span>
         </div>
 

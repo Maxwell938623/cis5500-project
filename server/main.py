@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from routes import stations, fare_evasion, boroughs, trends, map as map_routes, metadata, arrests
 
-app = FastAPI(title="NYC Subway Fare Evasion Analytics API", version="1.0.0")
+app = FastAPI(title="MetroGuard Fare Evasion Analytics API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,7 +24,7 @@ app.include_router(arrests, prefix="/arrests", tags=["arrests"])
 
 @app.get("/")
 def root():
-    return {"message": "NYC Subway Fare Evasion Analytics API", "status": "running"}
+    return {"message": "MetroGuard Fare Evasion Analytics API", "status": "running"}
 
 
 @app.get("/health")
