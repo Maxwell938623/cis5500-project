@@ -19,12 +19,12 @@ def get_arrests_by_charge_year(year: Optional[int] = Query(None)):
             if target_year is None:
                 return []
 
-            where_clause = "WHERE year = %s AND LAW_CAT_CD IN ('F', 'M', 'V')"
-            sql = f"""
-                SELECT year, LAW_CAT_CD, COUNT(*) AS arrest_count
+            sql = """
+                SELECT year, law_cat_cd, COUNT(*) AS arrest_count
                 FROM arrestsnypddataframe
-                {where_clause}
-                GROUP BY year, LAW_CAT_CD
+                WHERE year = %s
+                  AND law_cat_cd IN ('F', 'M', 'V')
+                GROUP BY year, law_cat_cd
                 ORDER BY year, arrest_count DESC
             """
             cur.execute(sql, [target_year])

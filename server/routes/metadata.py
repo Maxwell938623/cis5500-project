@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException
 from database import get_db_connection
-from .sql_common import STATION_META_CTE
 
 router = APIRouter()
 
@@ -11,10 +10,9 @@ def get_boroughs():
         with get_db_connection() as conn:
             cur = conn.cursor()
             cur.execute(
-                f"""
-                WITH {STATION_META_CTE}
+                """
                 SELECT DISTINCT borough
-                FROM station_meta
+                FROM station_meta_mv
                 WHERE borough IS NOT NULL
                 ORDER BY borough
                 """

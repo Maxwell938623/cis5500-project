@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 from database import get_db_connection
-from .sql_common import RIDERSHIP_ALL_CTE, STATION_META_CTE
 
 router = APIRouter()
 
@@ -17,41 +16,23 @@ def get_busiest_stations(
             cur = conn.cursor()
             target_year = year
             if target_year is None:
-                cur.execute(
-                    f"""
-                    WITH {RIDERSHIP_ALL_CTE}
-                    SELECT MAX(year)::int AS max_year
-                    FROM ridership_all
-                    WHERE year IS NOT NULL
-                    """
-                )
+                cur.execute("SELECT MAX(year)::int AS max_year FROM station_year_ridership_mv")
                 row = cur.fetchone()
                 target_year = row["max_year"] if row else None
             if target_year is None:
                 return []
 
-            conditions = ["r.year IS NOT NULL"]
-            params = []
-            if target_year is not None:
-                conditions.append("r.year = %s")
-                params.append(target_year)
-            where_clause = " AND ".join(conditions)
-            params.append(limit)
-            cur.execute(
-                f"""
-                WITH {RIDERSHIP_ALL_CTE},
-                {STATION_META_CTE}
-                SELECT sm.station_complex, sm.borough,
-                       SUM(r.ridership) AS total_ridership
-                FROM ridership_all r
-                JOIN station_meta sm ON r.station_complex_id = sm.station_complex_id
-                WHERE {where_clause}
-                GROUP BY sm.station_complex, sm.borough
+            sql = """
+                SELECT
+                    station_complex,
+                    borough,
+                    total_ridership
+                FROM station_summary_mv
+                WHERE year = %s
                 ORDER BY total_ridership DESC
                 LIMIT %s
-                """,
-                params,
-            )
+            """
+            cur.execute(sql, [target_year, limit])
             rows = cur.fetchall()
             return [dict(r) for r in rows]
     except RuntimeError as e:
@@ -72,62 +53,46 @@ def get_arrest_intensity(
             cur = conn.cursor()
             target_year = year
             if target_year is None:
-                cur.execute(
-                    f"""
-                    WITH {RIDERSHIP_ALL_CTE}
-                    SELECT MAX(year)::int AS max_year
-                    FROM ridership_all
-                    WHERE year IS NOT NULL
-                    """
-                )
+                cur.execute("SELECT MAX(year)::int AS max_year FROM station_year_ridership_mv")
                 row = cur.fetchone()
                 target_year = row["max_year"] if row else None
             if target_year is None:
                 return []
 
-            post_conditions = []
-            post_params = []
+            conditions = []
+            params = []
             if borough:
-                post_conditions.append("sm.borough ILIKE %s")
-                post_params.append(borough)
+                conditions.append("sm.borough ILIKE %s")
+                params.append(borough)
             if target_year is not None:
-                post_conditions.append("sr.year = %s")
-                post_params.append(target_year)
+                conditions.append("sr.year = %s")
+                params.append(target_year)
 
-            where_clause = ("WHERE " + " AND ".join(post_conditions)) if post_conditions else ""
-            post_params.append(limit)
+            where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+            params.append(limit)
 
             sql = f"""
-                WITH {RIDERSHIP_ALL_CTE},
-                {STATION_META_CTE},
-                station_arrests AS (
-                    SELECT station_complex_id, year, COUNT(*) AS total_arrests
-                    FROM arrestsnypddataframe
-                    GROUP BY station_complex_id, year
-                ),
-                station_ridership AS (
-                    SELECT station_complex_id, year, SUM(ridership) AS total_ridership
-                    FROM ridership_all
-                    GROUP BY station_complex_id, year
-                )
                 SELECT
                     sm.station_complex,
                     sm.borough,
                     sr.year,
                     sr.total_ridership,
-                    COALESCE(sa.total_arrests, 0)                                        AS total_arrests,
-                    ROUND(100000.0 * COALESCE(sa.total_arrests, 0)
-                          / NULLIF(sr.total_ridership, 0), 2)                           AS arrests_per_100k_riders
-                FROM station_ridership sr
-                JOIN station_meta sm ON sr.station_complex_id = sm.station_complex_id
-                LEFT JOIN station_arrests sa
+                    COALESCE(sa.total_arrests, 0) AS total_arrests,
+                    ROUND(
+                        (100000.0 * COALESCE(sa.total_arrests, 0) / NULLIF(sr.total_ridership, 0))::numeric,
+                        2
+                    ) AS arrests_per_100k_riders
+                FROM station_year_ridership_mv sr
+                JOIN station_meta_mv sm
+                    ON sr.station_complex_id = sm.station_complex_id
+                LEFT JOIN station_year_arrests_mv sa
                     ON sr.station_complex_id = sa.station_complex_id
-                    AND sr.year = sa.year
+                   AND sr.year                = sa.year
                 {where_clause}
                 ORDER BY arrests_per_100k_riders DESC
                 LIMIT %s
             """
-            cur.execute(sql, post_params)
+            cur.execute(sql, params)
             rows = cur.fetchall()
             return [dict(r) for r in rows]
     except RuntimeError as e:

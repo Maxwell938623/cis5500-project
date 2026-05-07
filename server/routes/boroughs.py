@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 from database import get_db_connection
-from .sql_common import RIDERSHIP_ALL_CTE, STATION_META_CTE
 
 router = APIRouter()
 
@@ -14,10 +13,10 @@ def get_ada_stations():
             cur = conn.cursor()
             cur.execute(
                 """
-                SELECT sc.borough, COUNT(*) AS accessible_stations
-                FROM stationcoords sc
-                WHERE sc.ADA = TRUE
-                GROUP BY sc.borough
+                SELECT borough, COUNT(*) AS accessible_stations
+                FROM stationcoords
+                WHERE ada = '1'
+                GROUP BY borough
                 ORDER BY accessible_stations DESC
                 """
             )
@@ -46,25 +45,25 @@ def get_demographic_arrests(
             if target_year is None:
                 return []
 
-            conditions = ["sm.borough IS NOT NULL"]
+            conditions = ["borough IS NOT NULL"]
             params = []
             if borough:
-                conditions.append("sm.borough ILIKE %s")
+                conditions.append("borough ILIKE %s")
                 params.append(borough)
             if target_year is not None:
-                conditions.append("a.year = %s")
+                conditions.append("year = %s")
                 params.append(target_year)
 
             where_clause = " AND ".join(conditions)
             sql = f"""
-                WITH {STATION_META_CTE}
-                SELECT sm.borough, a.AGE_GROUP, a.PERP_RACE,
-                       COUNT(*) AS arrest_count
-                FROM arrestsnypddataframe a
-                JOIN station_meta sm ON a.station_complex_id = sm.station_complex_id
+                SELECT
+                    borough,
+                    age_group,
+                    perp_race,
+                    arrest_count
+                FROM demographic_arrests_mv
                 WHERE {where_clause}
-                GROUP BY sm.borough, a.AGE_GROUP, a.PERP_RACE
-                ORDER BY sm.borough, arrest_count DESC
+                ORDER BY borough, arrest_count DESC
             """
             cur.execute(sql, params)
             rows = cur.fetchall()
@@ -83,69 +82,57 @@ def get_enforcement_disparity(year: Optional[int] = Query(None)):
             cur = conn.cursor()
             target_year = year
             if target_year is None:
-                cur.execute(
-                    f"""
-                    WITH {RIDERSHIP_ALL_CTE}
-                    SELECT MAX(year)::int AS max_year
-                    FROM ridership_all
-                    WHERE year IS NOT NULL
-                    """
-                )
+                cur.execute("SELECT MAX(year)::int AS max_year FROM borough_ridership_mv")
                 row = cur.fetchone()
                 target_year = row["max_year"] if row else None
             if target_year is None:
                 return []
 
-            yr_cond_r = ""
-            yr_cond_fe = ""
-            yr_cond_a = ""
+            conditions = []
             params = []
             if target_year is not None:
-                yr_cond_r = "AND r.year = %s"
-                yr_cond_fe = "AND year = %s"
-                yr_cond_a = "AND a.year = %s"
-                params = [target_year, target_year, target_year]
+                conditions.append("be.year = %s")
+                params.append(target_year)
+
+            where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
             sql = f"""
-                WITH {RIDERSHIP_ALL_CTE},
-                {STATION_META_CTE},
-                borough_ridership AS (
-                    SELECT sm.borough, r.year, SUM(r.ridership) AS paid_rides
-                    FROM ridership_all r
-                    JOIN station_meta sm ON r.station_complex_id = sm.station_complex_id
-                    WHERE sm.borough IS NOT NULL {yr_cond_r}
-                    GROUP BY sm.borough, r.year
-                ),
-                annual_evasion AS (
-                    SELECT year, AVG(fare_evasion) AS avg_evasion_rate
+                WITH annual_evasion AS (
+                    SELECT
+                        year,
+                        AVG(fare_evasion) AS avg_evasion_rate
                     FROM fareevasionstats
-                    WHERE fare_evasion IS NOT NULL {yr_cond_fe}
+                    WHERE fare_evasion IS NOT NULL
+                      AND year BETWEEN 2020 AND 2024
                     GROUP BY year
                 ),
                 borough_est_evasion AS (
-                    SELECT br.borough, br.year, br.paid_rides, ae.avg_evasion_rate,
-                           ROUND(br.paid_rides / NULLIF(1 - ae.avg_evasion_rate, 0)
-                                 * ae.avg_evasion_rate) AS est_evaded_rides
-                    FROM borough_ridership br
-                    JOIN annual_evasion ae ON br.year = ae.year
-                ),
-                borough_arrests AS (
-                    SELECT sm.borough, a.year, COUNT(*) AS total_arrests
-                    FROM arrestsnypddataframe a
-                    JOIN station_meta sm ON a.station_complex_id = sm.station_complex_id
-                    WHERE sm.borough IS NOT NULL {yr_cond_a}
-                    GROUP BY sm.borough, a.year
+                    SELECT
+                        br.borough,
+                        br.year,
+                        br.paid_rides,
+                        ae.avg_evasion_rate,
+                        ROUND(
+                            (br.paid_rides / NULLIF(1 - ae.avg_evasion_rate, 0) * ae.avg_evasion_rate)::numeric
+                        ) AS est_evaded_rides
+                    FROM borough_ridership_mv br
+                    JOIN annual_evasion ae
+                        ON br.year = ae.year
                 )
                 SELECT
                     be.borough,
                     be.year,
                     be.est_evaded_rides,
-                    COALESCE(ba.total_arrests, 0)                                         AS total_arrests,
-                    ROUND(100.0 * COALESCE(ba.total_arrests, 0)
-                          / NULLIF(be.est_evaded_rides, 0), 4)                           AS arrest_to_evasion_ratio
+                    COALESCE(ba.total_arrests, 0) AS total_arrests,
+                    ROUND(
+                        (100.0 * COALESCE(ba.total_arrests, 0) / NULLIF(be.est_evaded_rides, 0))::numeric,
+                        4
+                    ) AS arrest_to_evasion_ratio
                 FROM borough_est_evasion be
-                LEFT JOIN borough_arrests ba
-                    ON be.borough = ba.borough AND be.year = ba.year
+                LEFT JOIN borough_arrests_mv ba
+                    ON be.borough = ba.borough
+                   AND be.year    = ba.year
+                {where_clause}
                 ORDER BY be.year DESC, arrest_to_evasion_ratio DESC
             """
             cur.execute(sql, params)
