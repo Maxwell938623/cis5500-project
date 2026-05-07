@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
+from typing import List, Optional
 from database import get_db_connection
-from .sql_common import RIDERSHIP_ALL_CTE, STATION_META_CTE
+from .sql_common import RIDERSHIP_ALL_CTE, STATION_META_CTE, resolve_years
 
 router = APIRouter()
 
@@ -9,42 +9,40 @@ router = APIRouter()
 @router.get("/top-non-cbd-stations")
 def get_top_non_cbd_stations(
     borough: Optional[str] = Query(None),
+    years: Optional[List[int]] = Query(None),
     year: Optional[int] = Query(None),
     top_k: int = Query(5, ge=1, le=100),
 ):
-    """Query 10: Top Non-CBD Stations by Ridership with Arrest Counts per Borough"""
+    """Query 10: Top Non-CBD Stations by Ridership with Arrest Counts per Borough.
+
+    Sums ridership and arrests across all selected years and re-ranks within
+    each borough by combined ridership.
+    """
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
-            target_year = year
-            if target_year is None:
-                cur.execute(
-                    f"""
-                    WITH {RIDERSHIP_ALL_CTE}
-                    SELECT MAX(year)::int AS max_year
-                    FROM ridership_all
-                    WHERE year IS NOT NULL
-                    """
-                )
-                row = cur.fetchone()
-                target_year = row["max_year"] if row else None
-            if target_year is None:
+            target_years = resolve_years(
+                years,
+                year,
+                f"""
+                WITH {RIDERSHIP_ALL_CTE}
+                SELECT MAX(year)::int AS max_year
+                FROM ridership_all
+                WHERE year IS NOT NULL
+                """,
+                cur,
+            )
+            if not target_years:
                 return []
 
-            sv_conditions = ["sm.borough IS NOT NULL"]
-            sv_params = []
+            sv_conditions = ["sm.borough IS NOT NULL", "r.year = ANY(%s)"]
+            sv_params: list = [target_years]
             if borough:
                 sv_conditions.append("sm.borough ILIKE %s")
                 sv_params.append(borough)
-            if target_year is not None:
-                sv_conditions.append("r.year = %s")
-                sv_params.append(target_year)
 
-            ar_conditions = ["year IS NOT NULL"]
-            ar_params = []
-            if target_year is not None:
-                ar_conditions.append("year = %s")
-                ar_params.append(target_year)
+            ar_conditions = ["year IS NOT NULL", "year::int = ANY(%s)"]
+            ar_params: list = [target_years]
 
             sv_where = " AND ".join(sv_conditions)
             ar_where = " AND ".join(ar_conditions)
@@ -88,7 +86,7 @@ def get_top_non_cbd_stations(
                             NULLIF(to_jsonb(sc)->>'CBD', '')::boolean,
                             FALSE
                         ) AS is_cbd
-                    FROM stationcoords sc
+                    FROM stationcoordsdataframe sc
                 ),
                 stationcoords_agg AS (
                     SELECT

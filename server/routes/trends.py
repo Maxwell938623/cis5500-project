@@ -1,34 +1,38 @@
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
+from typing import List, Optional
 from database import get_db_connection
-from .sql_common import RIDERSHIP_ALL_CTE
+from .sql_common import RIDERSHIP_ALL_CTE, resolve_years
 
 router = APIRouter()
 
 
 @router.get("/annual")
 def get_annual_trends(
+    years: Optional[List[int]] = Query(None),
     year: Optional[int] = Query(None),
 ):
-    """Single-year monthly ridership and arrest trends with month-over-month change."""
+    """Monthly ridership and arrest trends for one or more selected years.
+
+    Returns one row per (year, month) so the client can render a separate
+    series per selected year. Month-over-month change is computed within
+    each year (January resets to 0).
+    """
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
 
-            target_year = year
-            if target_year is None:
-                cur.execute(
-                    f"""
-                    WITH {RIDERSHIP_ALL_CTE}
-                    SELECT MAX(year) AS max_year
-                    FROM ridership_all
-                    WHERE year IS NOT NULL
-                    """
-                )
-                row = cur.fetchone()
-                target_year = row["max_year"] if row else None
-
-            if target_year is None:
+            target_years = resolve_years(
+                years,
+                year,
+                f"""
+                WITH {RIDERSHIP_ALL_CTE}
+                SELECT MAX(year)::int AS max_year
+                FROM ridership_all
+                WHERE year IS NOT NULL
+                """,
+                cur,
+            )
+            if not target_years:
                 return []
 
             sql = f"""
@@ -36,32 +40,40 @@ def get_annual_trends(
                 monthly_ridership AS (
                     SELECT year, month, SUM(ridership) AS total_ridership
                     FROM ridership_all
-                    WHERE year = %s AND month IS NOT NULL
+                    WHERE year = ANY(%s) AND month IS NOT NULL
                     GROUP BY year, month
                 ),
                 monthly_arrests AS (
                     SELECT year::int AS year, month::int AS month, COUNT(*) AS total_arrests
                     FROM arrestsnypddataframe
-                    WHERE year = %s AND month IS NOT NULL
-                    GROUP BY year, month
+                    WHERE year::int = ANY(%s) AND month IS NOT NULL
+                    GROUP BY year::int, month::int
                 ),
                 calendar AS (
-                    SELECT generate_series(1, 12) AS month
+                    SELECT y AS year, m AS month
+                    FROM unnest(%s::int[]) AS y
+                    CROSS JOIN generate_series(1, 12) AS m
                 ),
                 combined AS (
                     SELECT
-                        %s::int AS year,
+                        c.year,
                         c.month,
                         COALESCE(mr.total_ridership, 0) AS total_ridership,
                         COALESCE(ma.total_arrests, 0) AS total_arrests
                     FROM calendar c
-                    LEFT JOIN monthly_ridership mr ON mr.month = c.month
-                    LEFT JOIN monthly_arrests ma ON ma.month = c.month
+                    LEFT JOIN monthly_ridership mr
+                        ON mr.year = c.year AND mr.month = c.month
+                    LEFT JOIN monthly_arrests ma
+                        ON ma.year = c.year AND ma.month = c.month
                 ),
                 with_lag AS (
                     SELECT year, month, total_ridership, total_arrests,
-                           LAG(total_ridership) OVER (ORDER BY month) AS prev_ridership,
-                           LAG(total_arrests)   OVER (ORDER BY month) AS prev_arrests
+                           LAG(total_ridership) OVER (
+                               PARTITION BY year ORDER BY month
+                           ) AS prev_ridership,
+                           LAG(total_arrests) OVER (
+                               PARTITION BY year ORDER BY month
+                           ) AS prev_arrests
                     FROM combined
                 )
                 SELECT
@@ -77,9 +89,9 @@ def get_annual_trends(
                              / NULLIF(prev_arrests, 0), 2)
                     END AS mom_arrest_change_pct
                 FROM with_lag
-                ORDER BY month
+                ORDER BY year, month
             """
-            cur.execute(sql, [target_year, target_year, target_year])
+            cur.execute(sql, [target_years, target_years, target_years])
             rows = cur.fetchall()
             return [dict(r) for r in rows]
     except RuntimeError as e:
