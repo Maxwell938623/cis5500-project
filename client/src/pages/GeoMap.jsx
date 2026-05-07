@@ -47,17 +47,24 @@ export default function GeoMap() {
   const [error, setError] = useState(null);
   const [borough, setBorough] = useState("");
   const [years, setYears] = useState([2024]);
+  const [appliedYears, setAppliedYears] = useState([2024]);
   const [topK, setTopK] = useState(5);
 
   const fetchStations = useCallback(async () => {
+    if (!years.length) {
+      setStations([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const params = { top_k: topK };
+      const params = { top_k: topK, years };
       if (borough) params.borough = borough;
-      if (years.length) params.years = years;
-      const res = await api.get("/map/top-non-cbd-stations", { params });
+      const res = await api.get("/map/top-stations", { params });
       setStations(res.data);
+      setAppliedYears(years);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -66,6 +73,13 @@ export default function GeoMap() {
   }, [borough, topK, years]);
 
   useEffect(() => { fetchStations(); }, []);
+
+  useEffect(() => {
+    if (!years.length) {
+      setStations([]);
+      setError(null);
+    }
+  }, [years]);
 
   const maxRidership = stations.length
     ? Math.max(...stations.map((s) => Number(s.total_ridership)))
@@ -80,7 +94,9 @@ export default function GeoMap() {
       !isNaN(Number(s.latitude)) && !isNaN(Number(s.longitude))
   );
 
-  const yearsCopy = yearsLabel(years);
+  const yearsCopy = yearsLabel(appliedYears);
+  const yearsKey = (arr) => [...arr].sort((a, b) => a - b).join(",");
+  const selectionStale = years.length > 0 && yearsKey(years) !== yearsKey(appliedYears);
 
   return (
     <div className="page-container">
@@ -107,11 +123,36 @@ export default function GeoMap() {
         </div>
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
-          <button className="btn btn-primary" onClick={fetchStations}>Apply</button>
+          <button className="btn btn-primary" onClick={fetchStations} disabled={!years.length}>Apply</button>
         </div>
       </div>
 
-      {!loading && !error && (
+      {years.length === 0 && (
+        <div className="ui-fade-in" style={{
+          textAlign: "center",
+          padding: "32px 20px",
+          marginBottom: 24,
+          border: "1px dashed var(--border)",
+          borderRadius: 12,
+          color: "var(--text-secondary)",
+        }}>
+          Please select at least one year to view data.
+        </div>
+      )}
+
+      {selectionStale && (
+        <div className="ui-fade-in" style={{
+          fontSize: "0.8rem",
+          color: "var(--accent)",
+          fontStyle: "italic",
+          marginBottom: 12,
+          paddingLeft: 4,
+        }}>
+          Selection changed &mdash; press Apply to refresh.
+        </div>
+      )}
+
+      {years.length > 0 && !loading && !error && (
         <div className="grid-4 ui-fade-in" style={{ marginBottom: 20 }}>
           <MetricCard label="Stations Shown" value={stations.length} color="#3b82f6" />
           <MetricCard label="Boroughs" value={boroughCount} color="#10b981" />
@@ -130,10 +171,10 @@ export default function GeoMap() {
         </div>
       )}
 
-      {loading && <LoadingSpinner message="Loading station map data..." />}
-      {error && <ErrorMessage message={error} onRetry={fetchStations} />}
+      {years.length > 0 && loading && <LoadingSpinner message="Loading station map data..." />}
+      {years.length > 0 && error && <ErrorMessage message={error} onRetry={fetchStations} />}
 
-      {!loading && !error && (
+      {years.length > 0 && !loading && !error && (
         <div className="ui-fade-in" style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 20 }}>
           <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)" }}>
             <MapContainer

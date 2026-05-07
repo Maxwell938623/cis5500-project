@@ -39,14 +39,20 @@ export default function FinancialImpact() {
   const [loading, setLoading] = useState({ quarterly: true, revenue: true });
   const [errors, setErrors] = useState({});
   const [years, setYears] = useState([2024]);
+  const [appliedYears, setAppliedYears] = useState([2024]);
 
   const fetchQuarterly = useCallback(async () => {
+    if (!years.length) {
+      setQuarterlyData([]);
+      setErrors((e) => ({ ...e, quarterly: null }));
+      setLoading((l) => ({ ...l, quarterly: false }));
+      return;
+    }
     setLoading((l) => ({ ...l, quarterly: true }));
     try {
-      const params = {};
-      if (years.length) params.years = years;
-      const res = await api.get("/fare-evasion/quarterly", { params });
+      const res = await api.get("/fare-evasion/quarterly", { params: { years } });
       setQuarterlyData(res.data);
+      setAppliedYears(years);
       setErrors((e) => ({ ...e, quarterly: null }));
     } catch (err) {
       setErrors((e) => ({ ...e, quarterly: err.message }));
@@ -56,11 +62,15 @@ export default function FinancialImpact() {
   }, [years]);
 
   const fetchRevenue = useCallback(async () => {
+    if (!years.length) {
+      setRevenueData([]);
+      setErrors((e) => ({ ...e, revenue: null }));
+      setLoading((l) => ({ ...l, revenue: false }));
+      return;
+    }
     setLoading((l) => ({ ...l, revenue: true }));
     try {
-      const params = {};
-      if (years.length) params.years = years;
-      const res = await api.get("/fare-evasion/revenue-loss", { params });
+      const res = await api.get("/fare-evasion/revenue-loss", { params: { years } });
       setRevenueData(res.data);
       setErrors((e) => ({ ...e, revenue: null }));
     } catch (err) {
@@ -75,6 +85,14 @@ export default function FinancialImpact() {
     fetchRevenue();
   }, []);
 
+  useEffect(() => {
+    if (!years.length) {
+      setQuarterlyData([]);
+      setRevenueData([]);
+      setErrors({});
+    }
+  }, [years]);
+
   const quarterlyWithLabel = quarterlyData.map((r) => ({
     ...r,
     label: `${r.year} Q${r.quarter}`,
@@ -87,6 +105,9 @@ export default function FinancialImpact() {
     : null;
   const totalEvaded = revenueData.reduce((s, r) => s + Number(r.est_evaded_rides || 0), 0);
 
+  const yearsKey = (arr) => [...arr].sort((a, b) => a - b).join(",");
+  const selectionStale = years.length > 0 && yearsKey(years) !== yearsKey(appliedYears);
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -98,7 +119,7 @@ export default function FinancialImpact() {
         <YearMultiSelect value={years} onChange={setYears} />
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
-          <button className="btn btn-primary" onClick={() => { fetchQuarterly(); fetchRevenue(); }}>Apply</button>
+          <button className="btn btn-primary" onClick={() => { fetchQuarterly(); fetchRevenue(); }} disabled={!years.length}>Apply</button>
         </div>
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
@@ -106,7 +127,32 @@ export default function FinancialImpact() {
         </div>
       </div>
 
-      {!loading.revenue && !loading.quarterly && (
+      {years.length === 0 && (
+        <div className="ui-fade-in" style={{
+          textAlign: "center",
+          padding: "32px 20px",
+          marginBottom: 24,
+          border: "1px dashed var(--border)",
+          borderRadius: 12,
+          color: "var(--text-secondary)",
+        }}>
+          Please select at least one year to view data.
+        </div>
+      )}
+
+      {selectionStale && (
+        <div className="ui-fade-in" style={{
+          fontSize: "0.8rem",
+          color: "var(--accent)",
+          fontStyle: "italic",
+          marginBottom: 12,
+          paddingLeft: 4,
+        }}>
+          Selection changed &mdash; press Apply to refresh.
+        </div>
+      )}
+
+      {years.length > 0 && !loading.revenue && !loading.quarterly && (
         <div className="grid-3 ui-fade-in" style={{ marginBottom: 24 }}>
           <MetricCard label="Total Est. Revenue Lost" value={fmt(totalRevenueLost)} color="#ef4444" />
           <MetricCard label="Total Est. Evaded Rides" value={fmtNum(totalEvaded)} color="#f59e0b" />

@@ -53,7 +53,7 @@ DB_PASSWORD=...
 | `GET /boroughs/payment-share` | Payment method breakdown by borough |
 | `GET /boroughs/evasion-intensity` | Estimated evasion intensity by borough |
 | `GET /trends/ridership-vs-evasion` | Annual ridership vs evasion trends |
-| `GET /map/top-non-cbd-stations` | Top non-CBD stations with coordinates |
+| `GET /map/top-stations` | Top stations per borough with coordinates |
 | `GET /metadata/boroughs` | Available boroughs |
 | `GET /metadata/lines` | Available subway lines |
 | `GET /metadata/payment-methods` | Payment method categories |

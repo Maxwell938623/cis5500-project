@@ -25,17 +25,23 @@ export default function StationIndex() {
   const [intensityData, setIntensityData] = useState([]);
   const [borough, setBorough] = useState("");
   const [years, setYears] = useState([2024]);
+  const [appliedYears, setAppliedYears] = useState([2024]);
   const [intensityLimit, setIntensityLimit] = useState(50);
   const [loading, setLoading] = useState({ busiest: true, intensity: true });
   const [errors, setErrors] = useState({});
 
   const fetchBusiest = useCallback(async () => {
+    if (!years.length) {
+      setBusiestData([]);
+      setErrors((e) => ({ ...e, busiest: null }));
+      setLoading((l) => ({ ...l, busiest: false }));
+      return;
+    }
     setLoading((l) => ({ ...l, busiest: true }));
     try {
-      const params = { limit: 10 };
-      if (years.length) params.years = years;
-      const res = await api.get("/stations/busiest", { params });
+      const res = await api.get("/stations/busiest", { params: { limit: 10, years } });
       setBusiestData(res.data);
+      setAppliedYears(years);
       setErrors((e) => ({ ...e, busiest: null }));
     } catch (err) {
       setErrors((e) => ({ ...e, busiest: err.message }));
@@ -45,11 +51,16 @@ export default function StationIndex() {
   }, [years]);
 
   const fetchIntensity = useCallback(async () => {
+    if (!years.length) {
+      setIntensityData([]);
+      setErrors((e) => ({ ...e, intensity: null }));
+      setLoading((l) => ({ ...l, intensity: false }));
+      return;
+    }
     setLoading((l) => ({ ...l, intensity: true }));
     try {
-      const params = { limit: intensityLimit };
+      const params = { limit: intensityLimit, years };
       if (borough) params.borough = borough;
-      if (years.length) params.years = years;
       const res = await api.get("/stations/arrest-intensity", { params });
       setIntensityData(res.data);
       setErrors((e) => ({ ...e, intensity: null }));
@@ -65,13 +76,23 @@ export default function StationIndex() {
     fetchIntensity();
   }, []);
 
+  useEffect(() => {
+    if (!years.length) {
+      setBusiestData([]);
+      setIntensityData([]);
+      setErrors({});
+    }
+  }, [years]);
+
   const totalRidership = busiestData.reduce((s, r) => s + Number(r.total_ridership || 0), 0);
   const topStation = busiestData[0];
   const maxIntensity = intensityData.length
     ? Math.max(...intensityData.map((r) => Number(r.arrests_per_100k_riders || 0)))
     : null;
 
-  const yearsCopy = yearsLabel(years);
+  const yearsCopy = yearsLabel(appliedYears);
+  const yearsKey = (arr) => [...arr].sort((a, b) => a - b).join(",");
+  const selectionStale = years.length > 0 && yearsKey(years) !== yearsKey(appliedYears);
 
   return (
     <div className="page-container">
@@ -96,7 +117,7 @@ export default function StationIndex() {
         </div>
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
-          <button className="btn btn-primary" onClick={() => { fetchBusiest(); fetchIntensity(); }}>Apply</button>
+          <button className="btn btn-primary" onClick={() => { fetchBusiest(); fetchIntensity(); }} disabled={!years.length}>Apply</button>
         </div>
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
@@ -109,7 +130,32 @@ export default function StationIndex() {
         </div>
       </div>
 
-      {!loading.busiest && (
+      {years.length === 0 && (
+        <div className="ui-fade-in" style={{
+          textAlign: "center",
+          padding: "32px 20px",
+          marginBottom: 24,
+          border: "1px dashed var(--border)",
+          borderRadius: 12,
+          color: "var(--text-secondary)",
+        }}>
+          Please select at least one year to view data.
+        </div>
+      )}
+
+      {selectionStale && (
+        <div className="ui-fade-in" style={{
+          fontSize: "0.8rem",
+          color: "var(--accent)",
+          fontStyle: "italic",
+          marginBottom: 12,
+          paddingLeft: 4,
+        }}>
+          Selection changed &mdash; press Apply to refresh.
+        </div>
+      )}
+
+      {years.length > 0 && !loading.busiest && (
         <div className="grid-3 ui-fade-in" style={{ marginBottom: 24 }}>
           <MetricCard
             label="Top Station"
@@ -132,6 +178,7 @@ export default function StationIndex() {
         </div>
       )}
 
+      {years.length > 0 && (
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 20 }}>
         <div className="chart-container" style={{ marginBottom: 0 }}>
           <div className="chart-title">Station Arrest Intensity vs. Ridership</div>
@@ -228,6 +275,7 @@ export default function StationIndex() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

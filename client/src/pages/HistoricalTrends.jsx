@@ -45,15 +45,21 @@ export default function HistoricalTrends() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [years, setYears] = useState([2024]);
+  const [appliedYears, setAppliedYears] = useState([2024]);
 
   const fetchData = useCallback(async () => {
+    if (!years.length) {
+      setData([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const params = {};
-      if (years.length) params.years = years;
-      const res = await api.get("/trends/annual", { params });
+      const res = await api.get("/trends/annual", { params: { years } });
       setData(res.data || []);
+      setAppliedYears(years);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -62,6 +68,13 @@ export default function HistoricalTrends() {
   }, [years]);
 
   useEffect(() => { fetchData(); }, []);
+
+  useEffect(() => {
+    if (!years.length) {
+      setData([]);
+      setError(null);
+    }
+  }, [years]);
 
   const pivotedData = useMemo(() => {
     const byMonth = {};
@@ -110,6 +123,9 @@ export default function HistoricalTrends() {
   const fmtChange = (n) => (n != null ? `${n > 0 ? "+" : ""}${Number(n).toFixed(2)}%` : "N/A");
   const yearColor = (y) => YEAR_COLORS[y] || COLORS.ridership;
 
+  const yearsKey = (arr) => [...arr].sort((a, b) => a - b).join(",");
+  const selectionStale = years.length > 0 && yearsKey(years) !== yearsKey(appliedYears);
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -121,13 +137,38 @@ export default function HistoricalTrends() {
         <YearMultiSelect value={years} onChange={setYears} />
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
-          <button className="btn btn-primary" onClick={fetchData}>Apply</button>
+          <button className="btn btn-primary" onClick={fetchData} disabled={!years.length}>Apply</button>
         </div>
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
           <button className="btn btn-ghost" onClick={() => setYears([2024])}>Clear</button>
         </div>
       </div>
+
+      {years.length === 0 && (
+        <div className="ui-fade-in" style={{
+          textAlign: "center",
+          padding: "32px 20px",
+          marginBottom: 24,
+          border: "1px dashed var(--border)",
+          borderRadius: 12,
+          color: "var(--text-secondary)",
+        }}>
+          Please select at least one year to view data.
+        </div>
+      )}
+
+      {selectionStale && (
+        <div className="ui-fade-in" style={{
+          fontSize: "0.8rem",
+          color: "var(--accent)",
+          fontStyle: "italic",
+          marginBottom: 12,
+          paddingLeft: 4,
+        }}>
+          Selection changed &mdash; press Apply to refresh.
+        </div>
+      )}
 
       {!loading && !error && totals && (
         <div className="grid-2 ui-fade-in" style={{ marginBottom: 24 }}>
@@ -293,7 +334,7 @@ export default function HistoricalTrends() {
         </div>
       )}
 
-      {!loading && !error && data.length === 0 && (
+      {!loading && !error && data.length === 0 && years.length > 0 && (
         <div className="ui-fade-in" style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-secondary)" }}>
           No data found for the selected filters.
         </div>

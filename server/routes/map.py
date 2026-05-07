@@ -6,17 +6,19 @@ from .sql_common import resolve_years
 router = APIRouter()
 
 
-@router.get("/top-non-cbd-stations")
-def get_top_non_cbd_stations(
+@router.get("/top-stations")
+def get_top_stations(
     borough: Optional[str] = Query(None),
     years: Optional[List[int]] = Query(None),
     year: Optional[int] = Query(None),
     top_k: int = Query(5, ge=1, le=100),
 ):
-    """Query 10: Top Non-CBD Stations by Ridership with Arrest Counts per Borough.
+    """Query 10: Top Stations by Ridership with Arrest Counts per Borough.
 
     Sums ridership and arrests across all selected years and re-ranks within
-    each borough by combined ridership.
+    each borough by combined ridership. No CBD/geographic exclusions are
+    applied so every Manhattan station (including south of 60th St) is
+    eligible.
     """
     try:
         with get_db_connection() as conn:
@@ -30,7 +32,7 @@ def get_top_non_cbd_stations(
             if not target_years:
                 return []
 
-            inner_conditions = ["NOT is_cbd", "year = ANY(%s)"]
+            inner_conditions = ["year = ANY(%s)"]
             params: list = [target_years]
             if borough:
                 inner_conditions.append("borough ILIKE %s")

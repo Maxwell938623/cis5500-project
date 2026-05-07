@@ -62,6 +62,7 @@ export default function BoroughEquity() {
   const [errors, setErrors] = useState({});
   const [selectedBorough, setSelectedBorough] = useState("");
   const [years, setYears] = useState([2024]);
+  const [appliedYears, setAppliedYears] = useState([2024]);
   const [disparityYears, setDisparityYears] = useState([]);
 
   const fetchAda = useCallback(async () => {
@@ -78,12 +79,17 @@ export default function BoroughEquity() {
   }, []);
 
   const fetchCharge = useCallback(async () => {
+    if (!years.length) {
+      setChargeData([]);
+      setErrors((e) => ({ ...e, charge: null }));
+      setLoading((l) => ({ ...l, charge: false }));
+      return;
+    }
     setLoading((l) => ({ ...l, charge: true }));
     try {
-      const params = {};
-      if (years.length) params.years = years;
-      const res = await api.get("/arrests/by-charge-year", { params });
+      const res = await api.get("/arrests/by-charge-year", { params: { years } });
       setChargeData(res.data);
+      setAppliedYears(years);
       setErrors((e) => ({ ...e, charge: null }));
     } catch (err) {
       setErrors((e) => ({ ...e, charge: err.message }));
@@ -93,11 +99,16 @@ export default function BoroughEquity() {
   }, [years]);
 
   const fetchDemographic = useCallback(async () => {
+    if (!years.length) {
+      setDemographicData([]);
+      setErrors((e) => ({ ...e, demographic: null }));
+      setLoading((l) => ({ ...l, demographic: false }));
+      return;
+    }
     setLoading((l) => ({ ...l, demographic: true }));
     try {
-      const params = {};
+      const params = { years };
       if (selectedBorough) params.borough = selectedBorough;
-      if (years.length) params.years = years;
       const res = await api.get("/boroughs/demographic-arrests", { params });
       setDemographicData(res.data);
       setErrors((e) => ({ ...e, demographic: null }));
@@ -109,12 +120,16 @@ export default function BoroughEquity() {
   }, [selectedBorough, years]);
 
   const fetchDisparity = useCallback(async () => {
+    const effectiveYears = disparityYears.length ? disparityYears : years;
+    if (!effectiveYears.length) {
+      setDisparityData([]);
+      setErrors((e) => ({ ...e, disparity: null }));
+      setLoading((l) => ({ ...l, disparity: false }));
+      return;
+    }
     setLoading((l) => ({ ...l, disparity: true }));
     try {
-      const params = {};
-      const effectiveYears = disparityYears.length ? disparityYears : years;
-      if (effectiveYears.length) params.years = effectiveYears;
-      const res = await api.get("/boroughs/enforcement-disparity", { params });
+      const res = await api.get("/boroughs/enforcement-disparity", { params: { years: effectiveYears } });
       setDisparityData(res.data);
       setErrors((e) => ({ ...e, disparity: null }));
     } catch (err) {
@@ -130,6 +145,15 @@ export default function BoroughEquity() {
     fetchDemographic();
     fetchDisparity();
   }, []);
+
+  useEffect(() => {
+    if (!years.length) {
+      setChargeData([]);
+      setDemographicData([]);
+      setDisparityData([]);
+      setErrors((e) => ({ ...e, charge: null, demographic: null, disparity: null }));
+    }
+  }, [years]);
 
   const chargePivoted = React.useMemo(() => {
     const map = {};
@@ -154,7 +178,9 @@ export default function BoroughEquity() {
   const totalArrests = chargeData.reduce((s, r) => s + Number(r.arrest_count || 0), 0);
   const totalAdaStations = adaData.reduce((s, r) => s + Number(r.accessible_stations || 0), 0);
 
-  const yearsCopy = yearsLabel(years);
+  const yearsCopy = yearsLabel(appliedYears);
+  const yearsKey = (arr) => [...arr].sort((a, b) => a - b).join(",");
+  const selectionStale = years.length > 0 && yearsKey(years) !== yearsKey(appliedYears);
 
   return (
     <div className="page-container">
@@ -167,7 +193,7 @@ export default function BoroughEquity() {
         <YearMultiSelect value={years} onChange={setYears} />
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
-          <button className="btn btn-primary" onClick={() => { fetchCharge(); fetchDemographic(); fetchDisparity(); }}>Apply</button>
+          <button className="btn btn-primary" onClick={() => { fetchCharge(); fetchDemographic(); fetchDisparity(); }} disabled={!years.length}>Apply</button>
         </div>
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
@@ -175,7 +201,32 @@ export default function BoroughEquity() {
         </div>
       </div>
 
-      {!loading.charge && !loading.ada && (
+      {years.length === 0 && (
+        <div className="ui-fade-in" style={{
+          textAlign: "center",
+          padding: "32px 20px",
+          marginBottom: 24,
+          border: "1px dashed var(--border)",
+          borderRadius: 12,
+          color: "var(--text-secondary)",
+        }}>
+          Please select at least one year to view enforcement, demographic, and disparity data. ADA station counts will still load below.
+        </div>
+      )}
+
+      {selectionStale && (
+        <div className="ui-fade-in" style={{
+          fontSize: "0.8rem",
+          color: "var(--accent)",
+          fontStyle: "italic",
+          marginBottom: 12,
+          paddingLeft: 4,
+        }}>
+          Selection changed &mdash; press Apply to refresh.
+        </div>
+      )}
+
+      {years.length > 0 && !loading.charge && !loading.ada && (
         <div className="grid-3 ui-fade-in" style={{ marginBottom: 24 }}>
           <MetricCard label={`Total Arrests${yearsCopy ? ` (${yearsCopy})` : ""}`} value={fmt(totalArrests)} color="#ef4444" />
           <MetricCard label="ADA-Accessible Stations" value={fmt(totalAdaStations)} color="#3b82f6" />
@@ -187,6 +238,7 @@ export default function BoroughEquity() {
         </div>
       )}
 
+      {years.length > 0 && (
       <div className="chart-container">
         <div className="chart-title">Arrests by Charge Severity and Year</div>
         <div className="chart-subtitle">
@@ -220,6 +272,7 @@ export default function BoroughEquity() {
           </div>
         )}
       </div>
+      )}
 
       <div className="grid-2">
         <div className="chart-container">
@@ -251,6 +304,7 @@ export default function BoroughEquity() {
           )}
         </div>
 
+        {years.length > 0 && (
         <div className="chart-container">
           <div className="chart-title">Arrest-to-Evasion Ratio by Borough</div>
           <div className="chart-subtitle">
@@ -304,8 +358,10 @@ export default function BoroughEquity() {
             </div>
           )}
         </div>
+        )}
       </div>
 
+      {years.length > 0 && (
       <div className="chart-container">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12, flexWrap: "wrap", gap: 12 }}>
           <div>
@@ -318,7 +374,12 @@ export default function BoroughEquity() {
               onChange={setDisparityYears}
               label="Override Years"
             />
-            <button className="btn btn-primary" style={{ marginBottom: 0 }} onClick={fetchDisparity}>Apply</button>
+            <button
+              className="btn btn-primary"
+              style={{ marginBottom: 0 }}
+              onClick={fetchDisparity}
+              disabled={!(disparityYears.length || years.length)}
+            >Apply</button>
             <button className="btn btn-ghost" style={{ marginBottom: 0 }} onClick={() => setDisparityYears([])}>Clear</button>
           </div>
         </div>
@@ -367,7 +428,9 @@ export default function BoroughEquity() {
           </div>
         )}
       </div>
+      )}
 
+      {years.length > 0 && (
       <div className="chart-container">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12, flexWrap: "wrap", gap: 12 }}>
           <div>
@@ -422,6 +485,7 @@ export default function BoroughEquity() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
