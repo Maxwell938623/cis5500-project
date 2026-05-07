@@ -9,7 +9,7 @@ const navItems = [
   { to: "/map", label: "Geo Map" },
 ];
 
-export default function Navbar() {
+export default function Navbar({ onSignOut, email }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -49,7 +49,7 @@ export default function Navbar() {
         </div>
 
         {/* Desktop links */}
-        <div style={{ display: "flex", gap: 4 }} className="nav-links-desktop">
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }} className="nav-links-desktop">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -69,6 +69,29 @@ export default function Navbar() {
               {item.label}
             </NavLink>
           ))}
+          {email && (
+            <span
+              style={{
+                marginLeft: 8,
+                padding: "6px 10px",
+                borderRadius: 999,
+                fontSize: "0.78rem",
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border)",
+                background: "rgba(30, 58, 95, 0.35)",
+                maxWidth: 220,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+              title={email}
+            >
+              Logged in as {email}
+            </span>
+          )}
+          <button className="btn btn-ghost" style={{ padding: "6px 12px", fontSize: "0.85rem" }} onClick={onSignOut}>
+            Sign out
+          </button>
         </div>
 
         {/* Hamburger for mobile */}
@@ -96,6 +119,22 @@ export default function Navbar() {
           borderTop: "1px solid var(--border)",
           padding: "8px 20px 12px",
         }}>
+          {email && (
+            <div
+              style={{
+                margin: "6px 0 10px",
+                padding: "8px 10px",
+                borderRadius: 8,
+                fontSize: "0.8rem",
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border)",
+                background: "rgba(30, 58, 95, 0.35)",
+                wordBreak: "break-all",
+              }}
+            >
+              Logged in as {email}
+            </div>
+          )}
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -113,6 +152,16 @@ export default function Navbar() {
               {item.label}
             </NavLink>
           ))}
+          <button
+            className="btn btn-ghost"
+            style={{ marginTop: 10, width: "100%" }}
+            onClick={() => {
+              setOpen(false);
+              onSignOut?.();
+            }}
+          >
+            Sign out
+          </button>
         </div>
       )}
 
