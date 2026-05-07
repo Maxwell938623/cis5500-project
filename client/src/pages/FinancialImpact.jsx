@@ -18,6 +18,21 @@ function fmt(n) {
 }
 function fmtPct(n) { return n != null ? `${Number(n).toFixed(2)}%` : "N/A"; }
 function fmtNum(n) { return n != null ? Number(n).toLocaleString() : "N/A"; }
+function paddedDomain(values, padRatio = 0.08) {
+  const nums = values
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v));
+  if (!nums.length) return [0, 1];
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  if (min === max) {
+    const bump = Math.max(Math.abs(min) * padRatio, 1);
+    return [min - bump, max + bump];
+  }
+  const span = max - min;
+  const pad = span * padRatio;
+  return [min - pad, max + pad];
+}
 
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
@@ -93,11 +108,18 @@ export default function FinancialImpact() {
     }
   }, [years]);
 
-  const quarterlyWithLabel = quarterlyData.map((r) => ({
-    ...r,
-    label: `${r.year} Q${r.quarter}`,
-    errorVal: Number(r.margin_of_error_pct || 0),
-  }));
+  const quarterOrder = [1, 2, 3, 4];
+  const yearLineColors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#06b6d4"];
+  const quarterlyYears = [...new Set(quarterlyData.map((r) => Number(r.year)))].sort((a, b) => a - b);
+  const quarterlyByQuarter = quarterOrder.map((quarter) => {
+    const row = { quarter, quarterLabel: `Q${quarter}` };
+    quarterlyYears.forEach((year) => {
+      const match = quarterlyData.find((r) => Number(r.year) === year && Number(r.quarter) === quarter);
+      row[`year_${year}`] = match ? Number(match.evasion_pct) : null;
+      row[`year_${year}_error`] = match ? Number(match.margin_of_error_pct || 0) : 0;
+    });
+    return row;
+  });
 
   const totalRevenueLost = revenueData.reduce((s, r) => s + Number(r.est_revenue_lost_usd || 0), 0);
   const avgEvasionPct = quarterlyData.length
@@ -107,6 +129,10 @@ export default function FinancialImpact() {
 
   const yearsKey = (arr) => [...arr].sort((a, b) => a - b).join(",");
   const selectionStale = years.length > 0 && yearsKey(years) !== yearsKey(appliedYears);
+  const evasionValues = quarterlyData.map((r) => Number(r.evasion_pct));
+  const revenueValues = revenueData.map((r) => Number(r.est_revenue_lost_usd));
+  const [evasionYMin, evasionYMax] = paddedDomain(evasionValues, 0.1);
+  const [revenueYMin, revenueYMax] = paddedDomain(revenueValues, 0.1);
 
   return (
     <div className="page-container">
@@ -169,37 +195,48 @@ export default function FinancialImpact() {
         <div className="chart-subtitle">Estimated evasion rate (%) with survey margin of error per quarter</div>
         {loading.quarterly && <LoadingSpinner />}
         {errors.quarterly && <ErrorMessage message={errors.quarterly} onRetry={fetchQuarterly} />}
-        {!loading.quarterly && !errors.quarterly && quarterlyWithLabel.length > 0 && (
+        {!loading.quarterly && !errors.quarterly && quarterlyByQuarter.length > 0 && (
           <div className="ui-fade-in">
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={quarterlyWithLabel} margin={{ top: 10, right: 30, left: 20, bottom: 60 }}>
+              <LineChart data={quarterlyByQuarter} margin={{ top: 10, right: 30, left: 20, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis
-                  dataKey="label"
+                  dataKey="quarterLabel"
                   stroke="var(--text-secondary)"
-                  tick={{ fill: "var(--text-secondary)", fontSize: 11 }}
-                  angle={-45}
-                  textAnchor="end"
-                  height={60}
+                  tick={{ fill: "var(--text-secondary)", fontSize: 12 }}
                 />
                 <YAxis
                   stroke="var(--text-secondary)"
                   tick={{ fill: "var(--text-secondary)", fontSize: 12 }}
                   tickFormatter={(v) => `${v}%`}
+                  domain={[evasionYMin, evasionYMax]}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ color: "var(--text-secondary)", fontSize: 12 }} />
                 <ReferenceLine y={0} stroke="var(--border)" />
-                <Line
-                  type="monotone"
-                  dataKey="evasion_pct"
-                  stroke="#3b82f6"
-                  strokeWidth={2.5}
-                  dot={{ r: 3 }}
-                  name="Evasion Rate (%)"
-                >
-                  <ErrorBar dataKey="errorVal" width={4} strokeWidth={1.5} stroke="#60a5fa" opacity={0.6} />
-                </Line>
+                {quarterlyYears.map((year, i) => {
+                  const color = yearLineColors[i % yearLineColors.length];
+                  return (
+                    <Line
+                      key={year}
+                      type="monotone"
+                      dataKey={`year_${year}`}
+                      stroke={color}
+                      strokeWidth={2.5}
+                      dot={{ r: 3 }}
+                      connectNulls
+                      name={`${year}`}
+                    >
+                      <ErrorBar
+                        dataKey={`year_${year}_error`}
+                        width={4}
+                        strokeWidth={1.5}
+                        stroke={color}
+                        opacity={0.6}
+                      />
+                    </Line>
+                  );
+                })}
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -231,6 +268,7 @@ export default function FinancialImpact() {
                   stroke="var(--text-secondary)"
                   tick={{ fill: "var(--text-secondary)", fontSize: 12 }}
                   tickFormatter={(v) => `$${(v / 1_000_000).toFixed(0)}M`}
+                  domain={[revenueYMin, revenueYMax]}
                 />
                 <Tooltip
                   content={({ active, payload, label }) => {
