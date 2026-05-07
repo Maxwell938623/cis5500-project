@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
+from typing import List, Optional
 from database import get_db_connection
+from .sql_common import resolve_years
 
 router = APIRouter()
 
@@ -8,26 +9,29 @@ router = APIRouter()
 @router.get("/top-non-cbd-stations")
 def get_top_non_cbd_stations(
     borough: Optional[str] = Query(None),
+    years: Optional[List[int]] = Query(None),
     year: Optional[int] = Query(None),
     top_k: int = Query(5, ge=1, le=100),
 ):
-    """Query 10: Top Non-CBD Stations by Ridership with Arrest Counts per Borough"""
+    """Query 10: Top Non-CBD Stations by Ridership with Arrest Counts per Borough.
+
+    Sums ridership and arrests across all selected years and re-ranks within
+    each borough by combined ridership.
+    """
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
-            target_year = year
-            if target_year is None:
-                cur.execute("SELECT MAX(year)::int AS max_year FROM station_summary_mv")
-                row = cur.fetchone()
-                target_year = row["max_year"] if row else None
-            if target_year is None:
+            target_years = resolve_years(
+                years,
+                year,
+                "SELECT MAX(year)::int AS max_year FROM station_summary_mv",
+                cur,
+            )
+            if not target_years:
                 return []
 
-            inner_conditions = ["NOT is_cbd"]
-            params = []
-            if target_year is not None:
-                inner_conditions.append("year = %s")
-                params.append(target_year)
+            inner_conditions = ["NOT is_cbd", "year = ANY(%s)"]
+            params: list = [target_years]
             if borough:
                 inner_conditions.append("borough ILIKE %s")
                 params.append(borough)
@@ -36,7 +40,19 @@ def get_top_non_cbd_stations(
             params.append(top_k)
 
             sql = f"""
-                WITH ranked AS (
+                WITH aggregated AS (
+                    SELECT
+                        station_complex,
+                        borough,
+                        AVG(latitude)  AS latitude,
+                        AVG(longitude) AS longitude,
+                        SUM(total_ridership) AS total_ridership,
+                        SUM(total_arrests)   AS total_arrests
+                    FROM station_summary_mv
+                    WHERE {inner_where}
+                    GROUP BY station_complex, borough
+                ),
+                ranked AS (
                     SELECT
                         station_complex,
                         borough,
@@ -48,8 +64,7 @@ def get_top_non_cbd_stations(
                             PARTITION BY borough
                             ORDER BY total_ridership DESC
                         ) AS borough_rank
-                    FROM station_summary_mv
-                    WHERE {inner_where}
+                    FROM aggregated
                 )
                 SELECT
                     station_complex,
