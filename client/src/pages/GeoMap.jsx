@@ -5,6 +5,7 @@ import api from "../api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 import MetricCard from "../components/MetricCard";
+import YearMultiSelect from "../components/YearMultiSelect";
 
 import L from "leaflet";
 delete L.Icon.Default.prototype._getIconUrl;
@@ -30,12 +31,22 @@ function getRadius(ridership, max) {
   return Math.max(6, Math.min(28, 6 + (Number(ridership) / max) * 22));
 }
 
+function yearsLabel(years) {
+  if (!years.length) return "";
+  if (years.length === 1) return `${years[0]}`;
+  const sorted = [...years].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  const isContiguous = sorted.every((y, i) => i === 0 || y === sorted[i - 1] + 1);
+  return isContiguous ? `${min}-${max}` : sorted.join(", ");
+}
+
 export default function GeoMap() {
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [borough, setBorough] = useState("");
-  const [year, setYear] = useState("2024");
+  const [years, setYears] = useState([2024]);
   const [topK, setTopK] = useState(5);
 
   const fetchStations = useCallback(async () => {
@@ -44,7 +55,7 @@ export default function GeoMap() {
     try {
       const params = { top_k: topK };
       if (borough) params.borough = borough;
-      if (year) params.year = Number(year);
+      if (years.length) params.years = years;
       const res = await api.get("/map/top-non-cbd-stations", { params });
       setStations(res.data);
     } catch (err) {
@@ -52,7 +63,7 @@ export default function GeoMap() {
     } finally {
       setLoading(false);
     }
-  }, [borough, topK, year]);
+  }, [borough, topK, years]);
 
   useEffect(() => { fetchStations(); }, []);
 
@@ -69,11 +80,13 @@ export default function GeoMap() {
       !isNaN(Number(s.latitude)) && !isNaN(Number(s.longitude))
   );
 
+  const yearsCopy = yearsLabel(years);
+
   return (
     <div className="page-container">
       <div className="page-header">
         <h1>Geospatial Station Map</h1>
-        <p>Top stations per borough, circle size reflects total ridership, color reflects borough</p>
+        <p>Top stations per borough across selected years; circle size reflects total ridership, color reflects borough</p>
       </div>
 
       <div className="filters-bar">
@@ -83,14 +96,7 @@ export default function GeoMap() {
             {BOROUGHS.map((b) => <option key={b} value={b}>{b || "All Boroughs"}</option>)}
           </select>
         </div>
-        <div className="filter-group">
-          <label>Year</label>
-          <input
-            type="number" placeholder="e.g. 2024"
-            value={year} onChange={(e) => setYear(e.target.value)}
-            min="2020" max="2024" style={{ width: 110 }}
-          />
-        </div>
+        <YearMultiSelect value={years} onChange={setYears} />
         <div className="filter-group">
           <label>Top Stations per Borough</label>
           <select value={topK} onChange={(e) => setTopK(Number(e.target.value))}>
@@ -105,7 +111,6 @@ export default function GeoMap() {
         </div>
       </div>
 
-      {/* Metrics */}
       {!loading && !error && (
         <div className="grid-4 ui-fade-in" style={{ marginBottom: 20 }}>
           <MetricCard label="Stations Shown" value={stations.length} color="#3b82f6" />
@@ -113,13 +118,13 @@ export default function GeoMap() {
           <MetricCard
             label="Total Ridership"
             value={`${(totalRidership / 1_000_000).toFixed(1)}M`}
-            subValue="across shown stations"
+            subValue={`across shown stations${yearsCopy ? ` (${yearsCopy})` : ""}`}
             color="#f59e0b"
           />
           <MetricCard
             label="Total Arrests"
             value={fmtNum(totalArrests)}
-            subValue="across shown stations"
+            subValue={`across shown stations${yearsCopy ? ` (${yearsCopy})` : ""}`}
             color="#ef4444"
           />
         </div>
@@ -130,7 +135,6 @@ export default function GeoMap() {
 
       {!loading && !error && (
         <div className="ui-fade-in" style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 20 }}>
-          {/* Map */}
           <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)" }}>
             <MapContainer
               center={[40.7128, -74.006]}
@@ -188,12 +192,10 @@ export default function GeoMap() {
             </MapContainer>
           </div>
 
-          {/* Station list sidebar */}
           <div className="chart-container" style={{ marginBottom: 0, maxHeight: 620, overflowY: "auto" }}>
             <div className="chart-title">Station List</div>
             <div className="chart-subtitle" style={{ marginBottom: 12 }}>Top stations by borough</div>
 
-            {/* Borough legend */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
               {Object.entries(BOROUGH_COLORS).map(([b, c]) => (
                 <div key={b} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.75rem" }}>

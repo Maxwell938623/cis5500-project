@@ -7,6 +7,7 @@ import api from "../api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 import MetricCard from "../components/MetricCard";
+import YearMultiSelect from "../components/YearMultiSelect";
 
 const BOROUGH_COLORS = {
   Manhattan: "#3b82f6",
@@ -27,6 +28,16 @@ const VALID_CHARGE_TYPES = ["F", "M", "V"];
 
 function fmt(n) { return n != null ? Number(n).toLocaleString() : "N/A"; }
 function fmtRatio(n) { return n != null ? `${Number(n).toFixed(4)}%` : "N/A"; }
+
+function yearsLabel(years) {
+  if (!years.length) return "";
+  if (years.length === 1) return `${years[0]}`;
+  const sorted = [...years].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  const isContiguous = sorted.every((y, i) => i === 0 || y === sorted[i - 1] + 1);
+  return isContiguous ? `${min}-${max}` : sorted.join(", ");
+}
 
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
@@ -50,8 +61,8 @@ export default function BoroughEquity() {
   const [loading, setLoading] = useState({ ada: true, charge: true, demographic: true, disparity: true });
   const [errors, setErrors] = useState({});
   const [selectedBorough, setSelectedBorough] = useState("");
-  const [year, setYear] = useState("2024");
-  const [disparityYear, setDisparityYear] = useState("");
+  const [years, setYears] = useState([2024]);
+  const [disparityYears, setDisparityYears] = useState([]);
 
   const fetchAda = useCallback(async () => {
     setLoading((l) => ({ ...l, ada: true }));
@@ -70,7 +81,7 @@ export default function BoroughEquity() {
     setLoading((l) => ({ ...l, charge: true }));
     try {
       const params = {};
-      if (year) params.year = Number(year);
+      if (years.length) params.years = years;
       const res = await api.get("/arrests/by-charge-year", { params });
       setChargeData(res.data);
       setErrors((e) => ({ ...e, charge: null }));
@@ -79,14 +90,14 @@ export default function BoroughEquity() {
     } finally {
       setLoading((l) => ({ ...l, charge: false }));
     }
-  }, [year]);
+  }, [years]);
 
   const fetchDemographic = useCallback(async () => {
     setLoading((l) => ({ ...l, demographic: true }));
     try {
       const params = {};
       if (selectedBorough) params.borough = selectedBorough;
-      if (year) params.year = Number(year);
+      if (years.length) params.years = years;
       const res = await api.get("/boroughs/demographic-arrests", { params });
       setDemographicData(res.data);
       setErrors((e) => ({ ...e, demographic: null }));
@@ -95,14 +106,14 @@ export default function BoroughEquity() {
     } finally {
       setLoading((l) => ({ ...l, demographic: false }));
     }
-  }, [selectedBorough, year]);
+  }, [selectedBorough, years]);
 
   const fetchDisparity = useCallback(async () => {
     setLoading((l) => ({ ...l, disparity: true }));
     try {
       const params = {};
-      if (disparityYear) params.year = disparityYear;
-      else if (year) params.year = Number(year);
+      const effectiveYears = disparityYears.length ? disparityYears : years;
+      if (effectiveYears.length) params.years = effectiveYears;
       const res = await api.get("/boroughs/enforcement-disparity", { params });
       setDisparityData(res.data);
       setErrors((e) => ({ ...e, disparity: null }));
@@ -111,7 +122,7 @@ export default function BoroughEquity() {
     } finally {
       setLoading((l) => ({ ...l, disparity: false }));
     }
-  }, [disparityYear, year]);
+  }, [disparityYears, years]);
 
   useEffect(() => {
     fetchAda();
@@ -120,7 +131,6 @@ export default function BoroughEquity() {
     fetchDisparity();
   }, []);
 
-  // Pivot charge data by year: [{year, F, M, V}]
   const chargePivoted = React.useMemo(() => {
     const map = {};
     for (const row of chargeData) {
@@ -136,15 +146,15 @@ export default function BoroughEquity() {
     chargePivoted.some((row) => Number.isFinite(Number(row[type])))
   );
 
-  // Latest year disparity for bar chart
   const latestDisparityYear = disparityData.length
     ? Math.max(...disparityData.map((r) => r.year))
     : null;
   const latestDisparity = disparityData.filter((r) => r.year === latestDisparityYear);
 
-  // Summary: total arrests from charge data
   const totalArrests = chargeData.reduce((s, r) => s + Number(r.arrest_count || 0), 0);
   const totalAdaStations = adaData.reduce((s, r) => s + Number(r.accessible_stations || 0), 0);
+
+  const yearsCopy = yearsLabel(years);
 
   return (
     <div className="page-container">
@@ -154,32 +164,20 @@ export default function BoroughEquity() {
       </div>
 
       <div className="filters-bar">
-        <div className="filter-group">
-          <label>Year</label>
-          <input
-            type="number"
-            placeholder="e.g. 2024"
-            value={year}
-            onChange={(e) => setYear(e.target.value)}
-            min="2020"
-            max="2024"
-            style={{ width: 120 }}
-          />
-        </div>
+        <YearMultiSelect value={years} onChange={setYears} />
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
           <button className="btn btn-primary" onClick={() => { fetchCharge(); fetchDemographic(); fetchDisparity(); }}>Apply</button>
         </div>
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
-          <button className="btn btn-ghost" onClick={() => setYear("2024")}>Clear</button>
+          <button className="btn btn-ghost" onClick={() => setYears([2024])}>Clear</button>
         </div>
       </div>
 
-      {/* Summary metric cards */}
       {!loading.charge && !loading.ada && (
         <div className="grid-3 ui-fade-in" style={{ marginBottom: 24 }}>
-          <MetricCard label={`Total Arrests${year ? ` (${year})` : ""}`} value={fmt(totalArrests)} color="#ef4444" />
+          <MetricCard label={`Total Arrests${yearsCopy ? ` (${yearsCopy})` : ""}`} value={fmt(totalArrests)} color="#ef4444" />
           <MetricCard label="ADA-Accessible Stations" value={fmt(totalAdaStations)} color="#3b82f6" />
           <MetricCard
             label="Boroughs with Data"
@@ -189,7 +187,6 @@ export default function BoroughEquity() {
         </div>
       )}
 
-      {/* Arrests by Charge Severity and Year (Query 3) */}
       <div className="chart-container">
         <div className="chart-title">Arrests by Charge Severity and Year</div>
         <div className="chart-subtitle">
@@ -225,7 +222,6 @@ export default function BoroughEquity() {
       </div>
 
       <div className="grid-2">
-        {/* ADA Stations (Query 5) */}
         <div className="chart-container">
           <div className="chart-title">ADA-Accessible Stations by Borough</div>
           <div className="chart-subtitle">Stations with full ADA accessibility (ADA = 1)</div>
@@ -255,11 +251,10 @@ export default function BoroughEquity() {
           )}
         </div>
 
-        {/* Enforcement Disparity ratio chart (Query 8) */}
         <div className="chart-container">
           <div className="chart-title">Arrest-to-Evasion Ratio by Borough</div>
           <div className="chart-subtitle">
-            Selected year — arrests as % of estimated evaders; higher = heavier policing relative to evasion
+            Latest year in selection &mdash; arrests as % of estimated evaders; higher = heavier policing relative to evasion
           </div>
           {loading.disparity && <LoadingSpinner />}
           {errors.disparity && <ErrorMessage message={errors.disparity} onRetry={fetchDisparity} />}
@@ -311,24 +306,20 @@ export default function BoroughEquity() {
         </div>
       </div>
 
-      {/* Enforcement Disparity full table (Query 8) */}
       <div className="chart-container">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12, flexWrap: "wrap", gap: 12 }}>
           <div>
             <div className="chart-title" style={{ marginBottom: 4 }}>Borough Enforcement Disparity Detail</div>
             <div className="chart-subtitle">Arrests vs. estimated evasion volume per borough per year</div>
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-            <div className="filter-group" style={{ marginBottom: 0 }}>
-              <label style={{ fontSize: "0.75rem" }}>Filter Year</label>
-              <input
-                type="number" placeholder="Use page year"
-                value={disparityYear} onChange={(e) => setDisparityYear(e.target.value)}
-                min="2020" max="2024" style={{ width: 110 }}
-              />
-            </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <YearMultiSelect
+              value={disparityYears}
+              onChange={setDisparityYears}
+              label="Override Years"
+            />
             <button className="btn btn-primary" style={{ marginBottom: 0 }} onClick={fetchDisparity}>Apply</button>
-            <button className="btn btn-ghost" style={{ marginBottom: 0 }} onClick={() => setDisparityYear("")}>Clear</button>
+            <button className="btn btn-ghost" style={{ marginBottom: 0 }} onClick={() => setDisparityYears([])}>Clear</button>
           </div>
         </div>
 
@@ -377,12 +368,11 @@ export default function BoroughEquity() {
         )}
       </div>
 
-      {/* Demographic Breakdown of Arrests (Query 4) */}
       <div className="chart-container">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12, flexWrap: "wrap", gap: 12 }}>
           <div>
             <div className="chart-title" style={{ marginBottom: 4 }}>Demographic Breakdown of Arrests by Borough</div>
-            <div className="chart-subtitle">Age group and race breakdown of fare evasion enforcement</div>
+            <div className="chart-subtitle">Age group and race breakdown of fare evasion enforcement across selected years</div>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
             <div className="filter-group" style={{ marginBottom: 0 }}>
@@ -435,4 +425,3 @@ export default function BoroughEquity() {
     </div>
   );
 }
-

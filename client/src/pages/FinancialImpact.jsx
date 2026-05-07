@@ -7,6 +7,7 @@ import api from "../api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 import MetricCard from "../components/MetricCard";
+import YearMultiSelect from "../components/YearMultiSelect";
 
 function fmt(n) {
   if (n == null) return "N/A";
@@ -37,13 +38,13 @@ export default function FinancialImpact() {
   const [revenueData, setRevenueData] = useState([]);
   const [loading, setLoading] = useState({ quarterly: true, revenue: true });
   const [errors, setErrors] = useState({});
-  const [year, setYear] = useState("2024");
+  const [years, setYears] = useState([2024]);
 
   const fetchQuarterly = useCallback(async () => {
     setLoading((l) => ({ ...l, quarterly: true }));
     try {
       const params = {};
-      if (year) params.year = year;
+      if (years.length) params.years = years;
       const res = await api.get("/fare-evasion/quarterly", { params });
       setQuarterlyData(res.data);
       setErrors((e) => ({ ...e, quarterly: null }));
@@ -52,13 +53,13 @@ export default function FinancialImpact() {
     } finally {
       setLoading((l) => ({ ...l, quarterly: false }));
     }
-  }, [year]);
+  }, [years]);
 
   const fetchRevenue = useCallback(async () => {
     setLoading((l) => ({ ...l, revenue: true }));
     try {
       const params = {};
-      if (year) params.year = year;
+      if (years.length) params.years = years;
       const res = await api.get("/fare-evasion/revenue-loss", { params });
       setRevenueData(res.data);
       setErrors((e) => ({ ...e, revenue: null }));
@@ -67,7 +68,7 @@ export default function FinancialImpact() {
     } finally {
       setLoading((l) => ({ ...l, revenue: false }));
     }
-  }, [year]);
+  }, [years]);
 
   useEffect(() => {
     fetchQuarterly();
@@ -90,29 +91,21 @@ export default function FinancialImpact() {
     <div className="page-container">
       <div className="page-header">
         <h1>Financial Impact Analysis</h1>
-        <p>Quarterly fare evasion rates and estimated revenue loss ($2.90 base fare)</p>
+        <p>Quarterly fare evasion rates and estimated revenue loss ($2.90 base fare) across selected years</p>
       </div>
 
       <div className="filters-bar">
-        <div className="filter-group">
-          <label>Year</label>
-          <input
-            type="number" placeholder="e.g. 2024"
-            value={year} onChange={(e) => setYear(e.target.value)}
-            min="2015" max="2030"
-          />
-        </div>
+        <YearMultiSelect value={years} onChange={setYears} />
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
           <button className="btn btn-primary" onClick={() => { fetchQuarterly(); fetchRevenue(); }}>Apply</button>
         </div>
         <div className="filter-group" style={{ justifyContent: "flex-end" }}>
           <label>&nbsp;</label>
-          <button className="btn btn-ghost" onClick={() => { setYear("2024"); }}>Clear</button>
+          <button className="btn btn-ghost" onClick={() => setYears([2024])}>Clear</button>
         </div>
       </div>
 
-      {/* Metric cards */}
       {!loading.revenue && !loading.quarterly && (
         <div className="grid-3 ui-fade-in" style={{ marginBottom: 24 }}>
           <MetricCard label="Total Est. Revenue Lost" value={fmt(totalRevenueLost)} color="#ef4444" />
@@ -125,7 +118,6 @@ export default function FinancialImpact() {
         </div>
       )}
 
-      {/* Quarterly evasion rate chart */}
       <div className="chart-container">
         <div className="chart-title">Quarterly Fare Evasion Rate with Margin of Error</div>
         <div className="chart-subtitle">Estimated evasion rate (%) with survey margin of error per quarter</div>
@@ -168,7 +160,6 @@ export default function FinancialImpact() {
         )}
       </div>
 
-      {/* Revenue loss bar chart */}
       <div className="chart-container">
         <div className="chart-title">Estimated Revenue Lost per Quarter</div>
         <div className="chart-subtitle">Revenue not collected due to estimated fare evasion (USD, $2.90 fare)</div>
@@ -222,7 +213,6 @@ export default function FinancialImpact() {
               </BarChart>
             </ResponsiveContainer>
 
-            {/* Data table */}
             <div className="table-container" style={{ marginTop: 16 }}>
               <table>
                 <thead>

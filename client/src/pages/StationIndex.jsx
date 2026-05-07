@@ -3,17 +3,28 @@ import api from "../api";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 import MetricCard from "../components/MetricCard";
+import YearMultiSelect from "../components/YearMultiSelect";
 
 function fmtNum(n) { return n != null ? Number(n).toLocaleString() : "N/A"; }
 function fmtRate(n) { return n != null ? Number(n).toFixed(2) : "N/A"; }
 
 const BOROUGHS = ["", "Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"];
 
+function yearsLabel(years) {
+  if (!years.length) return "";
+  if (years.length === 1) return `${years[0]}`;
+  const sorted = [...years].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  const isContiguous = sorted.every((y, i) => i === 0 || y === sorted[i - 1] + 1);
+  return isContiguous ? `${min}-${max}` : sorted.join(", ");
+}
+
 export default function StationIndex() {
   const [busiestData, setBusiestData] = useState([]);
   const [intensityData, setIntensityData] = useState([]);
   const [borough, setBorough] = useState("");
-  const [year, setYear] = useState("2024");
+  const [years, setYears] = useState([2024]);
   const [intensityLimit, setIntensityLimit] = useState(50);
   const [loading, setLoading] = useState({ busiest: true, intensity: true });
   const [errors, setErrors] = useState({});
@@ -22,7 +33,7 @@ export default function StationIndex() {
     setLoading((l) => ({ ...l, busiest: true }));
     try {
       const params = { limit: 10 };
-      if (year) params.year = Number(year);
+      if (years.length) params.years = years;
       const res = await api.get("/stations/busiest", { params });
       setBusiestData(res.data);
       setErrors((e) => ({ ...e, busiest: null }));
@@ -31,14 +42,14 @@ export default function StationIndex() {
     } finally {
       setLoading((l) => ({ ...l, busiest: false }));
     }
-  }, [year]);
+  }, [years]);
 
   const fetchIntensity = useCallback(async () => {
     setLoading((l) => ({ ...l, intensity: true }));
     try {
       const params = { limit: intensityLimit };
       if (borough) params.borough = borough;
-      if (year) params.year = Number(year);
+      if (years.length) params.years = years;
       const res = await api.get("/stations/arrest-intensity", { params });
       setIntensityData(res.data);
       setErrors((e) => ({ ...e, intensity: null }));
@@ -47,7 +58,7 @@ export default function StationIndex() {
     } finally {
       setLoading((l) => ({ ...l, intensity: false }));
     }
-  }, [borough, year, intensityLimit]);
+  }, [borough, years, intensityLimit]);
 
   useEffect(() => {
     fetchBusiest();
@@ -60,6 +71,8 @@ export default function StationIndex() {
     ? Math.max(...intensityData.map((r) => Number(r.arrests_per_100k_riders || 0)))
     : null;
 
+  const yearsCopy = yearsLabel(years);
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -67,7 +80,6 @@ export default function StationIndex() {
         <p>Busiest stations by ridership and arrest intensity per station</p>
       </div>
 
-      {/* Filters at page level */}
       <div className="filters-bar">
         <div className="filter-group">
           <label>Borough</label>
@@ -75,14 +87,7 @@ export default function StationIndex() {
             {BOROUGHS.map((b) => <option key={b} value={b}>{b || "All Boroughs"}</option>)}
           </select>
         </div>
-        <div className="filter-group">
-          <label>Year</label>
-          <input
-            type="number" placeholder="e.g. 2023"
-            value={year} onChange={(e) => setYear(e.target.value)}
-            min="2020" max="2024" style={{ width: 110 }}
-          />
-        </div>
+        <YearMultiSelect value={years} onChange={setYears} />
         <div className="filter-group">
           <label>Limit</label>
           <select value={intensityLimit} onChange={(e) => setIntensityLimit(Number(e.target.value))}>
@@ -97,14 +102,13 @@ export default function StationIndex() {
           <label>&nbsp;</label>
           <button
             className="btn btn-ghost"
-            onClick={() => { setBorough(""); setYear("2024"); setIntensityLimit(50); }}
+            onClick={() => { setBorough(""); setYears([2024]); setIntensityLimit(50); }}
           >
             Clear
           </button>
         </div>
       </div>
 
-      {/* Summary metric cards */}
       {!loading.busiest && (
         <div className="grid-3 ui-fade-in" style={{ marginBottom: 24 }}>
           <MetricCard
@@ -116,7 +120,7 @@ export default function StationIndex() {
           <MetricCard
             label="Top 10 Combined Ridership"
             value={`${(totalRidership / 1_000_000).toFixed(1)}M`}
-            subValue={`rides${year ? ` (${year})` : ""}`}
+            subValue={`rides${yearsCopy ? ` (${yearsCopy})` : ""}`}
             color="#10b981"
           />
           <MetricCard
@@ -129,11 +133,10 @@ export default function StationIndex() {
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 20 }}>
-        {/* Arrest intensity table */}
         <div className="chart-container" style={{ marginBottom: 0 }}>
           <div className="chart-title">Station Arrest Intensity vs. Ridership</div>
           <div className="chart-subtitle">
-            Arrests per 100,000 riders — surfaces over- and under-policed stations relative to foot traffic
+            Arrests per 100,000 riders across selected years &mdash; surfaces over- and under-policed stations relative to foot traffic
           </div>
 
           {loading.intensity && <LoadingSpinner />}
@@ -146,7 +149,6 @@ export default function StationIndex() {
                     <th>#</th>
                     <th>Station</th>
                     <th>Borough</th>
-                    <th>Year</th>
                     <th>Total Ridership</th>
                     <th>Total Arrests</th>
                     <th>Arrests / 100k Riders</th>
@@ -154,11 +156,10 @@ export default function StationIndex() {
                 </thead>
                 <tbody>
                   {intensityData.map((row, i) => (
-                    <tr key={`${row.station_complex}-${row.year}-${i}`}>
+                    <tr key={`${row.station_complex}-${i}`}>
                       <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
                       <td style={{ fontWeight: 500 }}>{row.station_complex}</td>
                       <td>{row.borough}</td>
-                      <td>{row.year}</td>
                       <td>{fmtNum(row.total_ridership)}</td>
                       <td>{fmtNum(row.total_arrests)}</td>
                       <td>
@@ -182,11 +183,10 @@ export default function StationIndex() {
           )}
         </div>
 
-        {/* Top 10 Busiest Stations sidebar */}
         <div>
           <div className="chart-container" style={{ marginBottom: 0 }}>
             <div className="chart-title">Top 10 Busiest Stations</div>
-            <div className="chart-subtitle" style={{ marginBottom: 12 }}>By total ridership{year ? ` (${year})` : ""}</div>
+            <div className="chart-subtitle" style={{ marginBottom: 12 }}>By total ridership{yearsCopy ? ` (${yearsCopy})` : ""}</div>
             {loading.busiest && <LoadingSpinner />}
             {errors.busiest && <ErrorMessage message={errors.busiest} />}
             {!loading.busiest && !errors.busiest && (
