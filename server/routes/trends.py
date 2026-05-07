@@ -37,7 +37,7 @@ def get_annual_trends(
                     LEFT JOIN monthly_ridership_mv mr
                         ON mr.year = %s::int AND mr.month = c.month
                     LEFT JOIN monthly_arrests_mv ma
-                        ON ma.year = %s::int AND ma.month = c.month
+                        ON ma.year = %s::int AND ma.month::int = c.month
                 ),
                 with_lag AS (
                     SELECT

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
-from database import get_db_connection
+from database import get_db_connection, resolve_fare_evasion_source
 
 router = APIRouter()
 
@@ -14,7 +14,7 @@ def get_ada_stations():
             cur.execute(
                 """
                 SELECT borough, COUNT(*) AS accessible_stations
-                FROM stationcoords
+                FROM stationcoordsdataframe
                 WHERE ada = '1'
                 GROUP BY borough
                 ORDER BY accessible_stations DESC
@@ -37,6 +37,9 @@ def get_demographic_arrests(
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
+            fare_evasion_source = resolve_fare_evasion_source(cur)
+            fare_evasion_table = fare_evasion_source["table"]
+            fare_evasion_cols = fare_evasion_source["columns"]
             target_year = year
             if target_year is None:
                 cur.execute("SELECT MAX(year)::int AS max_year FROM arrestsnypddataframe WHERE year IS NOT NULL")
@@ -80,6 +83,9 @@ def get_enforcement_disparity(year: Optional[int] = Query(None)):
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
+            fare_evasion_source = resolve_fare_evasion_source(cur)
+            fare_evasion_table = fare_evasion_source["table"]
+            fare_evasion_cols = fare_evasion_source["columns"]
             target_year = year
             if target_year is None:
                 cur.execute("SELECT MAX(year)::int AS max_year FROM borough_ridership_mv")
@@ -96,15 +102,15 @@ def get_enforcement_disparity(year: Optional[int] = Query(None)):
 
             where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
-            sql = f"""
+            sql = """
                 WITH annual_evasion AS (
                     SELECT
-                        year,
-                        AVG(fare_evasion) AS avg_evasion_rate
-                    FROM fareevasionstats
-                    WHERE fare_evasion IS NOT NULL
-                      AND year BETWEEN 2020 AND 2024
-                    GROUP BY year
+                        {year_col} AS year,
+                        AVG({fare_evasion_col}) AS avg_evasion_rate
+                    FROM {fare_evasion_table}
+                    WHERE {fare_evasion_col} IS NOT NULL
+                      AND {year_col} BETWEEN 2020 AND 2024
+                    GROUP BY {year_col}
                 ),
                 borough_est_evasion AS (
                     SELECT
@@ -135,6 +141,12 @@ def get_enforcement_disparity(year: Optional[int] = Query(None)):
                 {where_clause}
                 ORDER BY be.year DESC, arrest_to_evasion_ratio DESC
             """
+            sql = sql.format(
+                fare_evasion_table=fare_evasion_table,
+                year_col=fare_evasion_cols["year"],
+                fare_evasion_col=fare_evasion_cols["fare_evasion"],
+                where_clause=where_clause,
+            )
             cur.execute(sql, params)
             rows = cur.fetchall()
             return [dict(r) for r in rows]

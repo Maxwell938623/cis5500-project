@@ -31,7 +31,7 @@ def get_lines():
         with get_db_connection() as conn:
             cur = conn.cursor()
             cur.execute(
-                "SELECT DISTINCT daytime_routes FROM stationcoords WHERE daytime_routes IS NOT NULL ORDER BY daytime_routes"
+                'SELECT DISTINCT "Daytime Routes" AS daytime_routes FROM stationcoordsdataframe WHERE "Daytime Routes" IS NOT NULL ORDER BY "Daytime Routes"'
             )
             rows = cur.fetchall()
             return [r["daytime_routes"] for r in rows]
