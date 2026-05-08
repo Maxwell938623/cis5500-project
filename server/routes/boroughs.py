@@ -8,7 +8,6 @@ router = APIRouter()
 
 @router.get("/ada-stations")
 def get_ada_stations():
-    """Query 5: ADA-Accessible Stations per Borough"""
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
@@ -35,7 +34,6 @@ def get_demographic_arrests(
     years: Optional[List[int]] = Query(None),
     year: Optional[int] = Query(None),
 ):
-    """Query 4: Demographic Breakdown of Arrests by Borough across selected years."""
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
@@ -80,7 +78,6 @@ def get_enforcement_disparity(
     years: Optional[List[int]] = Query(None),
     year: Optional[int] = Query(None),
 ):
-    """Query 8: Borough Enforcement Disparity, returns one row per (borough, year)."""
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()

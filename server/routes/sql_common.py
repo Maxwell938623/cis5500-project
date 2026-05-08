@@ -1,15 +1,4 @@
-"""Shared SQL helpers for the optimized routes.
-
-The heavy yearly UNION-ALL CTE constants that used to live here have been
-replaced by materialized views (``monthly_ridership_mv``,
-``station_year_ridership_mv``, ``borough_ridership_mv``, ``station_summary_mv``,
-``demographic_arrests_mv``, ``quarterly_paid_ridership``, etc.) that already
-pre-aggregate every fact by year. Routes now read those MVs directly.
-
-What stays here is the multi-year resolution helper used by every year-aware
-endpoint to validate, dedupe, and sort the ``years`` list query param while
-still accepting the legacy ``year`` single-value param.
-"""
+# Normalize year-query inputs for routes that support years/year params.
 
 from typing import Iterable, Optional
 
@@ -23,13 +12,6 @@ def resolve_years(
     fallback_latest_sql: str,
     cur,
 ) -> list[int]:
-    """Validate, dedupe, and sort multi-year input.
-
-    Accepts the new ``years`` list param and the legacy single-value ``year``
-    param. Falls back to the latest available year via ``fallback_latest_sql``
-    when no valid years are supplied. Returns ``[]`` only if the fallback
-    itself returns no data.
-    """
     selected: list[int] = []
     if years:
         selected.extend(int(y) for y in years if y is not None)
@@ -39,6 +21,7 @@ def resolve_years(
     selected = [y for y in selected if y in VALID_YEARS]
 
     if not selected:
+        # Fallback to latest available year when filters are missing/invalid.
         cur.execute(fallback_latest_sql)
         row = cur.fetchone()
         latest = row["max_year"] if row else None

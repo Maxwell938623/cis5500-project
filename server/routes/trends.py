@@ -11,12 +11,7 @@ def get_annual_trends(
     years: Optional[List[int]] = Query(None),
     year: Optional[int] = Query(None),
 ):
-    """Monthly ridership and arrest trends for one or more selected years.
-
-    Returns one row per (year, month) so the client can render a separate
-    series per selected year. Month-over-month change is computed within
-    each year (January resets to 0).
-    """
+    # Build full year-month grid so missing months return as zeros.
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()

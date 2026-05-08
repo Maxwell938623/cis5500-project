@@ -13,7 +13,6 @@ def get_busiest_stations(
     years: Optional[List[int]] = Query(None),
     year: Optional[int] = Query(None),
 ):
-    """Query 1: Top N Busiest Stations by Total Ridership across selected years."""
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
@@ -63,12 +62,7 @@ def get_arrest_intensity(
     year: Optional[int] = Query(None),
     limit: int = Query(50, ge=1, le=500),
 ):
-    """Query 7: Station-Level Arrest Intensity vs. Ridership.
-
-    Aggregates ridership and arrests across all selected years into a single
-    row per station, then computes arrests-per-100k-riders against the
-    combined totals.
-    """
+    # Compute arrests per 100k riders from multi-year station totals.
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()

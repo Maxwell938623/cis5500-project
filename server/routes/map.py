@@ -13,13 +13,7 @@ def get_top_stations(
     year: Optional[int] = Query(None),
     top_k: int = Query(5, ge=1, le=100),
 ):
-    """Query 10: Top Stations by Ridership with Arrest Counts per Borough.
-
-    Sums ridership and arrests across all selected years and re-ranks within
-    each borough by combined ridership. No CBD/geographic exclusions are
-    applied so every Manhattan station (including south of 60th St) is
-    eligible.
-    """
+    # Aggregate across selected years, then rank stations within each borough.
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()

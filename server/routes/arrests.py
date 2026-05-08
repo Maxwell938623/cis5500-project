@@ -11,7 +11,6 @@ def get_arrests_by_charge_year(
     years: Optional[List[int]] = Query(None),
     year: Optional[int] = Query(None),
 ):
-    """Query 3: Total Arrests by Charge Severity for one or more selected years."""
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()

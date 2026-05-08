@@ -35,7 +35,7 @@ def _quote_ident(identifier: str) -> str:
 
 
 def _resolve_fare_evasion_relation(cur):
-    """Return schema/relation names for the available fare-evasion source."""
+    # Pick the best-available fare-evasion relation across schema variants.
     cur.execute(
         """
         SELECT
@@ -76,26 +76,12 @@ def _resolve_fare_evasion_relation(cur):
 
 
 def resolve_fare_evasion_table(cur):
-    """Return a safely quoted fare-evasion relation name."""
     schema_name, relation_name = _resolve_fare_evasion_relation(cur)
     return f"{_quote_ident(schema_name)}.{_quote_ident(relation_name)}"
 
 
 def resolve_fare_evasion_source(cur):
-    """
-    Resolve fare-evasion relation and key column identifiers across schema variants.
-
-    Returns:
-        {
-            "table": "<quoted schema.table>",
-            "columns": {
-                "year": "<quoted column>",
-                "quarter": "<quoted column>",
-                "fare_evasion": "<quoted column>",
-                "margin_of_error": "<quoted column>",
-            }
-        }
-    """
+    # Resolve canonical fare-evasion columns when source schemas differ.
     schema_name, relation_name = _resolve_fare_evasion_relation(cur)
     cur.execute(
         """

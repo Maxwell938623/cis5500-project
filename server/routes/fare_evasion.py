@@ -11,7 +11,6 @@ def get_quarterly_evasion(
     years: Optional[List[int]] = Query(None),
     year: Optional[int] = Query(None),
 ):
-    """Query 2: Quarterly System-Wide Fare Evasion Rate across selected years."""
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
@@ -62,7 +61,6 @@ def get_revenue_loss(
     years: Optional[List[int]] = Query(None),
     year: Optional[int] = Query(None),
 ):
-    """Query 6: Estimated Revenue Lost to Fare Evasion per Quarter across selected years."""
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
