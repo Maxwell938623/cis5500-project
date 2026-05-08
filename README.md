@@ -12,6 +12,12 @@ Frontend setup:
 2. Run: cd client
 3. Run: npm install
 
+Supabase auth setup:
+1. In client environment varaibles, set:
+   - `VITE_SUPABASE_URL=<your-supabase-project-url>`
+   - `VITE_SUPABASE_KEY=<your-supabase-anon-key>`
+2. Enable Google and GitHub authentication providers in Supabase
+
 Running the app
 1. Start backend: from server/, run uvicorn main:app --reload --port 8000
 2. Start frontend: from client/, run npm run dev
