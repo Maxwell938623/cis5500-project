@@ -1,99 +1,28 @@
-# NYC Subway Analytics, CIS 5500 Project
+Backend prerequisites: Python 3.9+ and pip.
+Frontend prerequisites: Node.js 16+ and npm.
 
-A full-stack web application for analyzing NYC subway ridership patterns and estimated fare evasion data.
+Backend setup:
+1. Open a terminal in the project root.
+2. Run: cd server
+3. Run: pip install -r requirements.txt
+4. Ensure database environment variables are set in server directory (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD).
 
-## Architecture
+Frontend setup:
+1. Open a second terminal in the project root.
+2. Run: cd client
+3. Run: npm install
 
-```
-cis5500-project/
-  server/        FastAPI Python backend (connects to AWS RDS PostgreSQL)
-  client/        React frontend (Create React App structure)
-```
+Running the app
+1. Start backend: from server/, run uvicorn main:app --reload --port 8000
+2. Start frontend: from client/, run npm run dev
+3. Open the frontend URL shown by Vite (usually http://localhost:5173)
+4. Backend API is available at http://localhost:8000
 
-## Backend Setup
-
-### Prerequisites
-- Python 3.9+
-- pip
-
-### Install & Run
-
-```bash
-cd server
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-```
-
-The API will be available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
-
-### Environment Variables
-
-The `.env` file in `server/` is pre-configured with the AWS RDS credentials. To override, edit `server/.env`:
-
-```
-DB_HOST=...
-DB_PORT=5432
-DB_NAME=postgres
-DB_USER=...
-DB_PASSWORD=...
-```
-
-### API Endpoints
-
-| Endpoint | Description |
-|---|---|
-| `GET /stations/busiest` | Top stations by total ridership |
-| `GET /stations/risk-profile` | Station fare-risk profile (reduced-fare %) |
-| `GET /stations/search` | Station autocomplete search |
-| `GET /stations/{id}` | Station detail |
-| `GET /fare-evasion/quarterly` | Quarterly evasion rate with margin of error |
-| `GET /fare-evasion/revenue-loss` | Estimated revenue lost per quarter |
-| `GET /boroughs/ridership-by-year` | Borough ridership over time |
-| `GET /boroughs/ada-stations` | ADA-accessible station counts |
-| `GET /boroughs/payment-share` | Payment method breakdown by borough |
-| `GET /boroughs/evasion-intensity` | Estimated evasion intensity by borough |
-| `GET /trends/ridership-vs-evasion` | Annual ridership vs evasion trends |
-| `GET /map/top-stations` | Top stations per borough with coordinates |
-| `GET /metadata/boroughs` | Available boroughs |
-| `GET /metadata/lines` | Available subway lines |
-| `GET /metadata/payment-methods` | Payment method categories |
-| `GET /metadata/fare-categories` | Fare class categories |
-
-## Frontend Setup
-
-### Prerequisites
-- Node.js 16+
-- npm
-
-### Install & Run
-
-```bash
-cd client
-npm install
-npm start
-```
-
-The app will open at `http://localhost:3000`. It proxies API requests to `http://localhost:8000`.
-
-### Pages
-
-| Page | Route | Description |
-|---|---|---|
-| Historical Trends | `/trends` | Annual ridership vs evasion with YoY change |
-| Borough Equity | `/borough-equity` | Ridership, ADA stations, and evasion intensity by borough |
-| Financial Impact | `/financial-impact` | Quarterly evasion rates, revenue loss estimates, payment share |
-| Station Index | `/station-index` | Fare-risk profile table with station search and detail |
-| Geo Map | `/map` | Leaflet map of top non-CBD stations by borough |
-
-## Database Schema
-
-- **fareevasionstats**, `(year, quarter, fare_evasion, margin_of_error)`, MTA quarterly survey data
-- **stationcoords**, Station metadata with geographic coordinates and ADA/CBD flags
-- **ridership**, Tap-in ridership records with payment method and fare class
-
-## Tech Stack
-
-- **Backend**: FastAPI, psycopg2, Python 3.9+
-- **Frontend**: React 18, React Router 6, Recharts 2, React-Leaflet 4, Axios
-- **Database**: PostgreSQL on AWS RDS
-- **Map tiles**: CartoDB Dark Matter (OpenStreetMap data)
+Important implementation details
+1. Backend framework is FastAPI; routes are organized under server/routes and registered in server/main.py.
+2. Database access is centralized in server/database.py using psycopg2 with RealDictCursor.
+3. The backend supports both years (multi-select) and year (legacy single value) query params via server/routes/sql_common.py.
+4. Fare-evasion queries dynamically resolve schema/table/column variants to handle source naming differences.
+5. Frontend is React + Vite; routing and auth gating are handled in client/src/App.jsx.
+6. Supabase auth is optional at runtime; when env vars are missing, the app avoids auth API calls.
+7. Several endpoints query pre-aggregated materialized views for performance (for example monthly_ridership_mv and station_summary_mv).
