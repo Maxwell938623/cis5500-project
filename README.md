@@ -16,7 +16,7 @@ Supabase auth setup:
 1. In client environment varaibles, set:
    - `VITE_SUPABASE_URL=<your-supabase-project-url>`
    - `VITE_SUPABASE_KEY=<your-supabase-anon-key>`
-2. Enable Google and GitHub authentication providers in Supabase
+2. Enable and setup Google and GitHub authentication providers in Supabase
 
 Running the app
 1. Start backend: from server/, run uvicorn main:app --reload --port 8000
