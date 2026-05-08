@@ -48,6 +48,7 @@ export default function GeoMap() {
   const [borough, setBorough] = useState("");
   const [years, setYears] = useState([2024]);
   const [appliedYears, setAppliedYears] = useState([2024]);
+  const [appliedBorough, setAppliedBorough] = useState("");
   const [topK, setTopK] = useState(5);
 
   const fetchStations = useCallback(async () => {
@@ -65,6 +66,7 @@ export default function GeoMap() {
       const res = await api.get("/map/top-stations", { params });
       setStations(res.data);
       setAppliedYears(years);
+      setAppliedBorough(borough);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -96,7 +98,9 @@ export default function GeoMap() {
 
   const yearsCopy = yearsLabel(appliedYears);
   const yearsKey = (arr) => [...arr].sort((a, b) => a - b).join(",");
-  const selectionStale = years.length > 0 && yearsKey(years) !== yearsKey(appliedYears);
+  const selectionStale =
+    years.length > 0 &&
+    (yearsKey(years) !== yearsKey(appliedYears) || borough !== appliedBorough);
 
   return (
     <div className="page-container">

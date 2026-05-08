@@ -9,6 +9,7 @@ router = APIRouter()
 @router.get("/busiest")
 def get_busiest_stations(
     limit: int = Query(10, ge=1, le=100),
+    borough: Optional[str] = Query(None),
     years: Optional[List[int]] = Query(None),
     year: Optional[int] = Query(None),
 ):
@@ -25,18 +26,28 @@ def get_busiest_stations(
             if not target_years:
                 return []
 
-            sql = """
+            post_conditions: list[str] = []
+            post_params: list = []
+            if borough:
+                post_conditions.append("borough ILIKE %s")
+                post_params.append(borough)
+
+            where_clause = "WHERE year = ANY(%s)"
+            if post_conditions:
+                where_clause += " AND " + " AND ".join(post_conditions)
+
+            sql = f"""
                 SELECT
                     station_complex,
                     borough,
                     SUM(total_ridership) AS total_ridership
                 FROM station_summary_mv
-                WHERE year = ANY(%s)
+                {where_clause}
                 GROUP BY station_complex, borough
                 ORDER BY total_ridership DESC
                 LIMIT %s
             """
-            cur.execute(sql, [target_years, limit])
+            cur.execute(sql, [target_years, *post_params, limit])
             rows = cur.fetchall()
             return [dict(r) for r in rows]
     except RuntimeError as e:

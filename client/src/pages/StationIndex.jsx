@@ -26,6 +26,7 @@ export default function StationIndex() {
   const [borough, setBorough] = useState("");
   const [years, setYears] = useState([2024]);
   const [appliedYears, setAppliedYears] = useState([2024]);
+  const [appliedBorough, setAppliedBorough] = useState("");
   const [intensityLimit, setIntensityLimit] = useState(50);
   const [loading, setLoading] = useState({ busiest: true, intensity: true });
   const [errors, setErrors] = useState({});
@@ -39,16 +40,19 @@ export default function StationIndex() {
     }
     setLoading((l) => ({ ...l, busiest: true }));
     try {
-      const res = await api.get("/stations/busiest", { params: { limit: 10, years } });
+      const params = { limit: 10, years };
+      if (borough) params.borough = borough;
+      const res = await api.get("/stations/busiest", { params });
       setBusiestData(res.data);
       setAppliedYears(years);
+      setAppliedBorough(borough);
       setErrors((e) => ({ ...e, busiest: null }));
     } catch (err) {
       setErrors((e) => ({ ...e, busiest: err.message }));
     } finally {
       setLoading((l) => ({ ...l, busiest: false }));
     }
-  }, [years]);
+  }, [borough, years]);
 
   const fetchIntensity = useCallback(async () => {
     if (!years.length) {
@@ -92,7 +96,9 @@ export default function StationIndex() {
 
   const yearsCopy = yearsLabel(appliedYears);
   const yearsKey = (arr) => [...arr].sort((a, b) => a - b).join(",");
-  const selectionStale = years.length > 0 && yearsKey(years) !== yearsKey(appliedYears);
+  const selectionStale =
+    years.length > 0 &&
+    (yearsKey(years) !== yearsKey(appliedYears) || borough !== appliedBorough);
 
   return (
     <div className="page-container">
